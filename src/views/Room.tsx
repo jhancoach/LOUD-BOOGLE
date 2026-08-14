@@ -311,6 +311,7 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
   const isPlaying = room.status === 'playing' && timeLeft > 0;
   
   const joinUrl = `${window.location.origin}/?room=${roomId}`;
+  const displayRoomId = roomId.toUpperCase();
 
   if (isTV) {
     const leftPlayers = computedPlayers.filter((_, i) => i % 2 === 0);
@@ -495,7 +496,7 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
           >
             {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>
-          <div className="w-12 h-12 bg-[#00FF00] rounded-full flex items-center justify-center text-black font-black text-2xl shadow-[0_0_15px_rgba(0,255,0,0.3)]">L</div>
+          <div className="w-12 h-12 bg-[#00FF00] rounded-full flex items-center justify-center text-black font-black text-2xl shadow-[0_0_15_rgba(0,255,0,0.3)]">L</div>
           <button onClick={onLeave} className="w-10 h-10 bg-[#141414] border border-[#222] rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-200"><X size={20} /></button>
         </div>
 
@@ -674,36 +675,35 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans p-2 sm:p-4 md:p-8 selection:bg-transparent">
-      <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-4 md:gap-8 items-start">
+    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans p-2 sm:p-4 selection:bg-transparent overflow-x-hidden">
+      <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-4 items-start">
         
         {/* Lado Esquerdo - Tabuleiro e Controles */}
         <div className="flex-1 w-full max-w-md mx-auto">
-          <header className="mb-4 md:mb-6 flex justify-between items-center bg-[#141414] p-3 md:p-4 rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-[#222]">
-            <div className="overflow-hidden">
-              <button onClick={onLeave} className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-300 transition text-[10px] font-bold uppercase mb-0.5 tracking-widest">
-                <ArrowLeft size={14} /> Sair
+          <header className="mb-4 flex justify-between items-center bg-[#141414] p-3 rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-[#222]">
+            <div className="overflow-hidden flex items-center gap-3">
+              <button onClick={onLeave} className="p-2 bg-[#1a1a1a] text-zinc-500 hover:text-zinc-300 transition rounded-xl border border-[#333]">
+                <ArrowLeft size={18} />
               </button>
-              <h1 className="text-sm md:text-xl font-black tracking-widest text-zinc-100 flex items-center gap-2 uppercase truncate">
-                Sala <span className="font-mono bg-[#1a1a1a] px-2 py-0.5 md:py-1 rounded text-[#00FF00] border border-[#333] shadow-[0_0_10px_rgba(0,255,0,0.1)]">{roomId}</span>
-              </h1>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 leading-none mb-1">SALA ONLINE</p>
+                <h1 className="text-xl font-black tracking-widest text-[#00FF00] flex items-center gap-2 uppercase truncate leading-none">
+                  {displayRoomId}
+                </h1>
+              </div>
             </div>
             
-            <div className="flex gap-1.5 md:gap-2 items-center">
+            <div className="flex gap-2 items-center">
               <button
                 onClick={handleToggleMute}
-                className="p-2 bg-[#1a1a1a] hover:bg-[#222] text-zinc-400 hover:text-zinc-200 rounded-xl border border-[#333] transition"
+                className="p-2.5 bg-[#1a1a1a] hover:bg-[#222] text-zinc-400 hover:text-zinc-200 rounded-xl border border-[#333] transition"
                 title={muted ? "Ativar Som" : "Silenciar Som"}
               >
-                {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-              </button>
-
-              <button onClick={() => window.open(`/?room=${roomId}&tv=true`, '_blank')} className="hidden sm:flex items-center gap-2 bg-[#1a1a1a] text-[#00FF00] px-3 py-1.5 rounded-lg font-bold hover:bg-[#222] transition text-sm border border-[#00FF00]/30 shadow-[0_0_10px_rgba(0,255,0,0.1)] uppercase tracking-wider">
-                <MonitorPlay size={16} /> <span className="hidden md:inline">Tela TV</span>
+                {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
               </button>
               
               {isPlaying && (
-                <div className="flex items-center scale-90 md:scale-100">
+                <div className="flex items-center">
                   <AnimatedTimer
                     timeLeft={timeLeft}
                     totalDuration={room.duration || 180}
@@ -717,35 +717,52 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
 
           <div 
             ref={boardRef}
-            className="bg-[#141414] p-3 md:p-5 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-[#222] select-none touch-none mb-4 md:mb-6 relative overflow-hidden"
+            className="bg-[#141414] p-3 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-[#222] select-none touch-none mb-4 relative overflow-hidden"
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
           >
             {room.status === 'waiting' && (
-              <div className="absolute inset-0 z-20 bg-[#0a0a0a]/95 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center p-6 text-center">
-                <div className="mb-4">
-                  <QRGenerator
-                    value={joinUrl}
-                    size={110}
-                    title="QR CODE DA SALA"
-                    subtitle="Aponte a câmera para entrar"
-                    showShareButtons={true}
-                  />
-                </div>
+              <div className="absolute inset-0 z-20 bg-[#0a0a0a]/98 backdrop-blur-md rounded-2xl flex flex-col p-4 overflow-y-auto custom-scrollbar">
                 
+                {/* QR Section - Compact */}
+                <div className="flex flex-col items-center mb-4">
+                  <div className="w-full bg-[#111] p-3 rounded-2xl border border-[#222] mb-3 flex flex-col items-center">
+                    <div className="bg-white p-2 rounded-xl mb-3 shadow-[0_0_15px_rgba(0,255,0,0.2)]">
+                      <QRCode value={joinUrl} size={90} viewBox={`0 0 256 256`} />
+                    </div>
+                    <div className="flex gap-2 w-full">
+                       <button 
+                         onClick={() => {
+                           navigator.clipboard.writeText(joinUrl);
+                           showMessage('Link copiado!', 'success');
+                         }}
+                         className="flex-1 py-2 bg-[#1a1a1a] text-zinc-300 rounded-xl font-black text-[10px] uppercase tracking-wider border border-[#333] flex items-center justify-center gap-1.5"
+                       >
+                         <Share2 size={14} /> Link
+                       </button>
+                       <button 
+                         onClick={() => window.open(`/?room=${roomId}&tv=true`, '_blank')}
+                         className="flex-1 py-2 bg-[#1a1a1a] text-[#00FF00] rounded-xl font-black text-[10px] uppercase tracking-wider border border-[#00FF00]/20 flex items-center justify-center gap-1.5"
+                       >
+                         <MonitorPlay size={14} /> TV
+                       </button>
+                    </div>
+                  </div>
+                </div>
+
                 {isHost ? (
-                  <div className="w-full flex flex-col gap-4 mb-6 max-w-sm">
-                    <div className="bg-[#1a1a1a] p-4 rounded-[1.5rem] border border-[#333] space-y-4">
+                  <div className="flex flex-col gap-3 mb-4">
+                    <div className="bg-[#111] p-3 rounded-2xl border border-[#222] space-y-4">
                       {/* Grid Size */}
-                      <div className="flex flex-col gap-2">
-                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Tamanho da Grade</label>
-                        <div className="grid grid-cols-5 gap-1.5">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest text-center">Tamanho da Grade</label>
+                        <div className="grid grid-cols-5 gap-1">
                           {[4, 5, 6, 7, 8].map(size => (
                             <button 
                               key={size}
                               onClick={() => updateRoomSettings(roomId, { gridSize: size, board: generateBoard(size) })}
-                              className={`py-2.5 rounded-xl font-black text-[10px] transition-all border ${room.gridSize === size ? 'bg-[#00FF00] text-black border-[#00FF00] shadow-lg' : 'bg-[#0a0a0a] text-zinc-500 border-[#222]'}`}
+                              className={`py-2 rounded-lg font-black text-[10px] transition-all border ${room.gridSize === size ? 'bg-[#00FF00] text-black border-[#00FF00]' : 'bg-[#0a0a0a] text-zinc-500 border-[#222]'}`}
                             >
                               {size}x{size}
                             </button>
@@ -753,80 +770,89 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
                         </div>
                       </div>
 
-                      {/* Duration */}
-                      <div className="flex flex-col gap-2">
-                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Tempo da Partida</label>
-                        <div className="flex bg-[#0a0a0a] p-1 rounded-xl border border-[#222] overflow-x-auto custom-scrollbar">
-                          {[60, 90, 120, 180, 240, 300].map(time => (
-                            <button 
-                              key={time}
-                              onClick={() => updateRoomSettings(roomId, { duration: time })}
-                              className={`flex-1 py-2 px-1 rounded-lg font-black text-[9px] transition-all whitespace-nowrap ${room.duration === time ? 'bg-[#00FF00] text-black' : 'text-zinc-600 hover:text-zinc-400'}`}
-                            >
-                              {time}s
-                            </button>
-                          ))}
+                      {/* Duration & Min Letters - Row */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest text-center">Tempo</label>
+                          <select 
+                            value={room.duration}
+                            onChange={(e) => updateRoomSettings(roomId, { duration: parseInt(e.target.value) })}
+                            className="bg-[#0a0a0a] text-zinc-300 p-2 rounded-xl border border-[#222] font-black text-xs text-center outline-none focus:border-[#00FF00]"
+                          >
+                            {[60, 90, 120, 180, 240, 300].map(time => (
+                              <option key={time} value={time}>{time}s</option>
+                            ))}
+                          </select>
                         </div>
-                      </div>
-
-                      {/* Min Letters */}
-                      <div className="flex flex-col gap-2">
-                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Mínimo de Letras</label>
-                        <div className="flex items-center justify-between bg-[#0a0a0a] p-1.5 rounded-xl border border-[#222] max-w-[160px] mx-auto w-full">
-                          <button 
-                            onClick={() => updateRoomSettings(roomId, { minWordLength: Math.max(3, (room.minWordLength || 3) - 1) })}
-                            className="w-8 h-8 rounded-lg bg-[#1a1a1a] border border-[#333] flex items-center justify-center text-[#00FF00] active:scale-90"
-                          >
-                            <Minus size={16} strokeWidth={3} />
-                          </button>
-                          <span className="text-xl font-black text-white">{room.minWordLength || 3}</span>
-                          <button 
-                            onClick={() => updateRoomSettings(roomId, { minWordLength: Math.min(8, (room.minWordLength || 3) + 1) })}
-                            className="w-8 h-8 rounded-lg bg-[#1a1a1a] border border-[#333] flex items-center justify-center text-[#00FF00] active:scale-90"
-                          >
-                            <Plus size={16} strokeWidth={3} />
-                          </button>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest text-center">Mínimo Letras</label>
+                          <div className="flex items-center justify-between bg-[#0a0a0a] p-1 rounded-xl border border-[#222]">
+                            <button 
+                              onClick={() => updateRoomSettings(roomId, { minWordLength: Math.max(3, (room.minWordLength || 3) - 1) })}
+                              className="w-7 h-7 rounded-lg bg-[#1a1a1a] flex items-center justify-center text-[#00FF00]"
+                            >
+                              <Minus size={14} />
+                            </button>
+                            <span className="text-sm font-black text-white">{room.minWordLength || 3}</span>
+                            <button 
+                              onClick={() => updateRoomSettings(roomId, { minWordLength: Math.min(8, (room.minWordLength || 3) + 1) })}
+                              className="w-7 h-7 rounded-lg bg-[#1a1a1a] flex items-center justify-center text-[#00FF00]"
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
+                    
+                    <div className="flex flex-col gap-2">
+                      <button onClick={handleStartGame} className="w-full bg-[#00FF00] text-black py-4 rounded-2xl font-black text-lg shadow-[0_0_25px_rgba(0,255,0,0.3)] active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-[0.2em]">
+                        <Play size={24} fill="currentColor" /> JOGAR
+                      </button>
+                      <button 
+                        onClick={() => setIsWordBankOpen(true)}
+                        className="w-full py-2 bg-[#1a1a1a] text-zinc-400 rounded-xl font-bold uppercase tracking-wider text-[10px] border border-[#333] transition"
+                      >
+                        Banco de Palavras
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="bg-[#1a1a1a] border border-[#333] px-6 py-4 rounded-[1.5rem] font-black text-zinc-300 mb-6 flex flex-col items-center gap-3 shadow-2xl">
-                     <div className="flex items-center gap-3 text-lg">
+                  <div className="bg-[#111] border border-[#222] p-4 rounded-2xl mb-4 flex flex-col items-center gap-3">
+                     <div className="flex items-center gap-3 text-lg font-black text-zinc-100">
                         <Clock size={20} className="text-[#00FF00]" /> 
                         <span>{room.duration}s</span>
-                        <span className="text-zinc-600">•</span>
+                        <span className="text-zinc-700">•</span>
                         <span>{room.gridSize}x{room.gridSize}</span>
                      </div>
-                     <p className="text-[10px] uppercase tracking-widest text-zinc-500">Mínimo de {room.minWordLength} letras por palavra</p>
+                     <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold">Aguardando o Host...</p>
+                     <button 
+                        onClick={() => setIsWordBankOpen(true)}
+                        className="py-2 px-4 bg-[#1a1a1a] text-zinc-400 rounded-xl font-bold uppercase tracking-wider text-[10px] border border-[#333] transition"
+                      >
+                        Ver Banco de Palavras
+                      </button>
                   </div>
                 )}
-                
-                {isHost ? (
-                  <div className="w-full flex flex-col gap-3">
-                    <button onClick={handleStartGame} className="w-full bg-[#00FF00] text-black px-8 py-4 rounded-xl font-black text-lg shadow-[0_0_20px_rgba(0,255,0,0.2)] hover:bg-[#00e600] transition-all flex items-center justify-center gap-2 uppercase tracking-widest">
-                      <Play size={24} fill="currentColor" /> START
-                    </button>
-                    <button 
-                      onClick={() => setIsWordBankOpen(true)}
-                      className="w-full py-2.5 bg-[#1a1a1a] hover:bg-[#222] text-[#00FF00] rounded-xl font-bold uppercase tracking-wider text-xs border border-[#00FF00]/30 transition flex items-center justify-center gap-2"
-                    >
-                      <Database size={15} /> Banco de Palavras
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-full flex flex-col gap-3 items-center">
-                    <div className="bg-[#111] text-zinc-500 px-8 py-3 rounded-xl font-bold border border-[#222] uppercase tracking-widest text-sm w-full text-center">
-                      Aguardando...
-                    </div>
-                    <button 
-                      onClick={() => setIsWordBankOpen(true)}
-                      className="py-2 px-4 bg-[#1a1a1a] hover:bg-[#222] text-zinc-400 hover:text-zinc-200 rounded-xl font-bold uppercase tracking-wider text-xs border border-[#333] transition flex items-center gap-2"
-                    >
-                      <BookOpen size={14} /> Ver Banco de Palavras
-                    </button>
-                  </div>
-                )}
+
+                {/* Players List in Lobby - Very Visible */}
+                <div className="mt-auto pt-4 border-t border-[#222]">
+                   <div className="flex items-center justify-between mb-2">
+                     <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                       <Users size={14} className="text-[#00FF00]" /> Jogadores ({players.length})
+                     </h3>
+                     <span className="text-[9px] bg-[#00FF00]/10 text-[#00FF00] px-2 py-0.5 rounded-full font-black border border-[#00FF00]/20">ONLINE</span>
+                   </div>
+                   <div className="flex flex-wrap gap-2">
+                     {players.map(p => (
+                       <div key={p.id} className="bg-[#1a1a1a] px-3 py-1.5 rounded-lg border border-[#333] flex items-center gap-2">
+                         <div className="w-2 h-2 rounded-full bg-[#00FF00] animate-pulse"></div>
+                         <span className="text-[11px] font-black uppercase text-zinc-300 truncate max-w-[80px]">{p.name}</span>
+                         {room.hostId === p.id && <Crown size={10} className="text-yellow-500" />}
+                       </div>
+                     ))}
+                   </div>
+                </div>
               </div>
             )}
 
@@ -864,36 +890,36 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
 
           <div className="h-20 flex items-center justify-center bg-[#141414] rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-[#222]">
              {isPlaying && (
-               <div className="text-center w-full">
-                 <div className={`text-3xl font-black tracking-widest ${isChecking ? 'text-zinc-500' : 'text-[#00FF00] drop-shadow-[0_0_10px_rgba(0,255,0,0.3)]'} flex items-center justify-center gap-3 h-10 uppercase`}>
-                   {currentWord || <span className="text-[#333]">___</span>}
-                   {isChecking && <Loader2 size={24} className="animate-spin text-zinc-500" />}
-                 </div>
-                 <div className="h-6 mt-1 flex items-center justify-center">
-                   {message && (
-                     <div className={`text-xs font-black flex items-center gap-2 uppercase tracking-widest
-                       ${message.type === 'success' ? 'text-[#00FF00]' : ''}
-                       ${message.type === 'error' ? 'text-red-500' : ''}
-                       ${message.type === 'info' ? 'text-zinc-400' : ''}
-                     `}>
-                       {message.type === 'success' && <Check size={16} strokeWidth={3} />}
-                       {message.type === 'error' && <X size={16} strokeWidth={3} />}
-                       {message.text}
-                       {message.type === 'error' && message.word && user && (
-                         <button 
-                           onClick={() => {
-                             suggestWord(message.word!, user.uid);
-                             showMessage('Enviada!', 'success');
-                           }}
-                           className="ml-2 bg-red-900/30 text-red-400 border border-red-500/30 px-2 py-0.5 rounded hover:bg-red-900/50 pointer-events-auto transition"
-                         >
-                           SUGERIR
-                         </button>
-                       )}
-                     </div>
-                   )}
-                 </div>
-               </div>
+                <div className="text-center w-full">
+                  <div className={`text-3xl font-black tracking-widest ${isChecking ? 'text-zinc-500' : 'text-[#00FF00] drop-shadow-[0_0_10px_rgba(0,255,0,0.3)]'} flex items-center justify-center gap-3 h-10 uppercase`}>
+                    {currentWord || <span className="text-[#333]">___</span>}
+                    {isChecking && <Loader2 size={24} className="animate-spin text-zinc-500" />}
+                  </div>
+                  <div className="h-6 mt-1 flex items-center justify-center">
+                    {message && (
+                      <div className={`text-xs font-black flex items-center gap-2 uppercase tracking-widest
+                        ${message.type === 'success' ? 'text-[#00FF00]' : ''}
+                        ${message.type === 'error' ? 'text-red-500' : ''}
+                        ${message.type === 'info' ? 'text-zinc-400' : ''}
+                      `}>
+                        {message.type === 'success' && <Check size={16} strokeWidth={3} />}
+                        {message.type === 'error' && <X size={16} strokeWidth={3} />}
+                        {message.text}
+                        {message.type === 'error' && message.word && user && (
+                          <button 
+                            onClick={() => {
+                              suggestWord(message.word!, user.uid);
+                              showMessage('Enviada!', 'success');
+                            }}
+                            className="ml-2 bg-red-900/30 text-red-400 border border-red-500/30 px-2 py-0.5 rounded hover:bg-red-900/50 pointer-events-auto transition"
+                          >
+                            SUGERIR
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
              )}
           </div>
         </div>
@@ -956,9 +982,7 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
               );
             })}
           </div>
-
         </div>
-
       </div>
 
       <WordBankModal
@@ -970,4 +994,3 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
     </div>
   );
 }
-

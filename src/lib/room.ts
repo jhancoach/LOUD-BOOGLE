@@ -2,10 +2,19 @@ import { db } from './firebase';
 import { collection, doc, setDoc, getDoc, updateDoc, arrayUnion, increment, addDoc } from 'firebase/firestore';
 import { generateBoard } from './boggle';
 
+const generateRoomCode = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No confusables like 0/O, 1/I
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+};
+
 export const createRoom = async (hostId: string, gridSize: number, minWordLength: number, duration: number) => {
   try {
-    const roomRef = doc(collection(db, 'rooms'));
-    const roomId = roomRef.id;
+    const roomId = generateRoomCode();
+    const roomRef = doc(db, 'rooms', roomId);
     
     const setPromise = setDoc(roomRef, {
       hostId,
