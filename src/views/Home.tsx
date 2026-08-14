@@ -129,9 +129,21 @@ export default function Home({ onJoinRoom, onStartOffline }: { onJoinRoom: (id: 
   }
 
   const handleCreateRoom = async () => {
-    if (!user) return;
-    const id = await createRoom(user.uid, gridSize, minWordLength, duration);
+    let activeUser = user;
+    if (!activeUser) {
+      activeUser = loginAsGuest(guestNameInput);
+    }
+    const id = await createRoom(activeUser.uid, gridSize, minWordLength, duration);
     onJoinRoom(id);
+  };
+
+  const handleStartTraining = () => {
+    if (!user) {
+      loginAsGuest(guestNameInput);
+    }
+    if (onStartOffline) {
+      onStartOffline({ gridSize, duration, minWordLength });
+    }
   };
 
   return (
@@ -144,27 +156,21 @@ export default function Home({ onJoinRoom, onStartOffline }: { onJoinRoom: (id: 
           <div className="absolute top-0 right-0 w-64 h-64 bg-[#00FF00]/5 blur-[100px] pointer-events-none rounded-full"></div>
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#00FF00]/5 blur-[100px] pointer-events-none rounded-full"></div>
 
-          <div className="flex flex-col items-center mb-10 relative z-10">
-            <h1 className="text-6xl font-black text-[#00FF00] tracking-widest uppercase mb-1 drop-shadow-[0_0_15px_rgba(0,255,0,0.3)]">LOUD</h1>
-            <h2 className="text-2xl font-black tracking-[0.35em] uppercase text-zinc-100 drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">BOOGLE</h2>
+          <div className="flex flex-col items-center mb-8 relative z-10">
+            <h1 className="text-5xl font-black text-[#00FF00] tracking-widest uppercase mb-1 drop-shadow-[0_0_15px_rgba(0,255,0,0.3)]">LOUD</h1>
+            <h2 className="text-xl font-black tracking-[0.35em] uppercase text-zinc-100 drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">BOOGLE</h2>
           </div>
 
-          {!user ? (
-            <div className="w-full space-y-4 relative z-10">
-              <button onClick={loginWithGoogle} className="w-full bg-white text-black px-6 py-4 rounded-xl font-bold hover:bg-zinc-200 transition shadow-lg flex items-center justify-center gap-3">
-                <svg className="w-6 h-6" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" /><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
-                ENTRAR COM GOOGLE
-              </button>
-
-              <button 
-                onClick={() => window.open(window.location.href, '_blank')} 
-                className="w-full bg-[#222] border border-[#333] text-zinc-200 px-6 py-3.5 rounded-xl font-bold hover:bg-[#2a2a2a] transition tracking-wider uppercase text-xs flex items-center justify-center gap-2"
-              >
-                <ExternalLink size={16} className="text-[#00FF00]" /> ABRIR EM NOVA ABA (GOOGLE LOGIN 100%)
-              </button>
-
-              <div className="pt-2 pb-1 border-t border-[#222] mt-4">
-                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-2">Ou jogar como Convidado (Online):</label>
+          <div className="w-full space-y-6 relative z-10">
+            {/* User Profile or Guest Quick Setup */}
+            {!user ? (
+              <div className="bg-[#0a0a0a] p-4 rounded-2xl border border-[#222] space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Identificação do Jogador</span>
+                  <button onClick={() => setIsWordBankOpen(true)} className="text-[10px] font-black text-[#00FF00] hover:underline flex items-center gap-1 uppercase">
+                    <BookOpen size={12} /> Dicionário
+                  </button>
+                </div>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <UserIcon size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -174,166 +180,151 @@ export default function Home({ onJoinRoom, onStartOffline }: { onJoinRoom: (id: 
                       value={guestNameInput}
                       onChange={(e) => setGuestNameInput(e.target.value)}
                       maxLength={15}
-                      className="w-full bg-[#0a0a0a] border border-[#333] rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#00FF00]"
+                      className="w-full bg-[#141414] border border-[#333] rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#00FF00]"
                     />
                   </div>
                   <button 
                     onClick={() => loginAsGuest(guestNameInput)}
-                    className="bg-[#00FF00] text-black px-5 py-3 rounded-xl font-black hover:bg-[#00e600] transition tracking-wide uppercase text-xs shadow-[0_0_15px_rgba(0,255,0,0.2)] flex items-center gap-1.5 whitespace-nowrap"
+                    className="bg-[#00FF00] text-black px-4 py-2.5 rounded-xl font-black hover:bg-[#00e600] transition tracking-wide uppercase text-xs shadow-[0_0_15px_rgba(0,255,0,0.2)] whitespace-nowrap"
                   >
-                    <Play size={16} fill="currentColor" /> ENTRAR
+                    Salvar Nome
+                  </button>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button onClick={loginWithGoogle} className="flex-1 bg-white text-black px-3 py-2.5 rounded-xl font-bold hover:bg-zinc-200 transition text-xs flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" /><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
+                    Google Login
+                  </button>
+                  <button onClick={() => window.open(window.location.href, '_blank')} className="bg-[#222] border border-[#333] text-zinc-300 px-3 py-2.5 rounded-xl font-bold hover:bg-[#2a2a2a] transition text-xs flex items-center justify-center gap-1">
+                    <ExternalLink size={14} className="text-[#00FF00]" /> Nova Aba
                   </button>
                 </div>
               </div>
-              
-              <p className="text-[11px] text-zinc-500 text-center uppercase tracking-wider">
-                Dica: O Google bloqueia pop-ups dentro de iframes. Abrindo em nova aba, o login com o Google funciona perfeitamente.
-              </p>
-
-              <button onClick={() => onStartOffline && onStartOffline({ gridSize: 4, duration: 180, minWordLength: 3 })} className="w-full bg-[#161616] border border-[#333333] text-zinc-300 px-6 py-3.5 rounded-xl font-bold hover:bg-[#222] transition tracking-wider uppercase text-xs flex items-center justify-center gap-2">
-                <Gamepad2 size={16} className="text-[#00FF00]" /> MODO TREINO (SOLO / OFFLINE)
-              </button>
-
-              <div className="pt-2 flex justify-center">
-                <button 
-                  onClick={() => setIsWordBankOpen(true)}
-                  className="text-xs font-black text-zinc-400 hover:text-[#00FF00] flex items-center gap-1.5 uppercase tracking-wider transition"
-                >
-                  <BookOpen size={14} className="text-[#00FF00]" /> Ver Dicionário IME-USP (245k+)
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="w-full space-y-8 relative z-10">
+            ) : (
               <div className="flex flex-col bg-[#0a0a0a] p-4 rounded-xl border border-[#222] gap-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-[#00FF00] rounded-full flex items-center justify-center text-black font-black text-xl uppercase shadow-[0_0_15px_rgba(0,255,0,0.3)]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[#00FF00] rounded-full flex items-center justify-center text-black font-black text-lg uppercase shadow-[0_0_15px_rgba(0,255,0,0.3)]">
                       {profile?.name?.[0] || user.uid[0]}
                     </div>
                     <div>
-                      <h2 className="font-bold text-zinc-100">{profile?.name || 'Jogador'}</h2>
-                      <p className="text-xs tracking-wider text-[#00FF00] font-bold uppercase">{profile?.wins || 0} Vitórias • {profile?.totalScore || 0} PTS</p>
+                      <h2 className="font-bold text-zinc-100 text-sm">{profile?.name || 'Jogador'}</h2>
+                      <p className="text-[10px] tracking-wider text-[#00FF00] font-bold uppercase">{profile?.wins || 0} Vitórias • {profile?.totalScore || 0} PTS</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setIsWordBankOpen(true)} className="p-2.5 text-zinc-500 hover:text-[#00FF00] hover:bg-[#1a1a1a] transition rounded-lg" title="Banco de Palavras">
-                      <Database size={18} />
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => setIsWordBankOpen(true)} className="p-2 text-zinc-500 hover:text-[#00FF00] hover:bg-[#1a1a1a] transition rounded-lg" title="Banco de Palavras">
+                      <Database size={16} />
                     </button>
-                    <button onClick={() => setIsEditingProfile(true)} className="p-2.5 text-zinc-500 hover:text-[#00FF00] hover:bg-[#1a1a1a] transition rounded-lg" title="Editar Perfil">
-                      <Edit2 size={18} />
+                    <button onClick={() => setIsEditingProfile(true)} className="p-2 text-zinc-500 hover:text-[#00FF00] hover:bg-[#1a1a1a] transition rounded-lg" title="Editar Perfil">
+                      <Edit2 size={16} />
                     </button>
-                    <button onClick={logout} className="p-2.5 text-zinc-500 hover:text-red-500 hover:bg-[#1a1a1a] transition rounded-lg" title="Sair">
-                      <LogOut size={18} />
+                    <button onClick={logout} className="p-2 text-zinc-500 hover:text-red-500 hover:bg-[#1a1a1a] transition rounded-lg" title="Sair">
+                      <LogOut size={16} />
                     </button>
                   </div>
                 </div>
 
-                {/* Persistent Stats Micro-grid */}
                 <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#1a1a1a]">
-                  <div className="bg-[#141414] p-2 rounded-lg text-center border border-[#222]">
-                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Palavras</span>
-                    <span className="text-sm font-black text-zinc-200">{profile?.wordsFound || 0}</span>
+                  <div className="bg-[#141414] p-1.5 rounded-lg text-center border border-[#222]">
+                    <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block">Palavras</span>
+                    <span className="text-xs font-black text-zinc-200">{profile?.wordsFound || 0}</span>
                   </div>
-                  <div className="bg-[#141414] p-2 rounded-lg text-center border border-[#222]">
-                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Partidas</span>
-                    <span className="text-sm font-black text-zinc-200">{profile?.gamesPlayed || 0}</span>
+                  <div className="bg-[#141414] p-1.5 rounded-lg text-center border border-[#222]">
+                    <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block">Partidas</span>
+                    <span className="text-xs font-black text-zinc-200">{profile?.gamesPlayed || 0}</span>
                   </div>
-                  <div className="bg-[#141414] p-2 rounded-lg text-center border border-[#222]">
-                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Recorde</span>
-                    <span className="text-sm font-black text-[#00FF00]">{profile?.highestSingleGameScore || profile?.totalScore || 0}</span>
+                  <div className="bg-[#141414] p-1.5 rounded-lg text-center border border-[#222]">
+                    <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block">Recorde</span>
+                    <span className="text-xs font-black text-[#00FF00]">{profile?.highestSingleGameScore || profile?.totalScore || 0}</span>
                   </div>
                 </div>
               </div>
+            )}
 
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-zinc-100 flex items-center gap-2 uppercase tracking-widest text-sm"><Play size={18} className="text-[#00FF00]" /> Configurar Sala</h3>
-                  <button 
-                    onClick={() => setIsWordBankOpen(true)}
-                    className="text-xs font-black text-[#00FF00] hover:text-[#00e600] flex items-center gap-1.5 uppercase tracking-wider bg-[#00FF00]/10 px-2.5 py-1 rounded-lg border border-[#00FF00]/20 transition"
-                  >
-                    <BookOpen size={13} /> Banco de Palavras
-                  </button>
-                </div>
-                <div className="space-y-4 mb-6">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold tracking-widest text-zinc-500 uppercase">Tabuleiro</label>
-                    <div className="flex gap-2">
-                      {[4, 5, 6, 7, 8].map(size => (
-                        <button key={size} onClick={() => setGridSize(size)} className={`flex-1 py-3 rounded-lg font-black text-sm transition border ${gridSize === size ? 'bg-[#00FF00] text-black border-[#00FF00] shadow-[0_0_15px_rgba(0,255,0,0.2)]' : 'bg-[#0a0a0a] text-zinc-400 border-[#222] hover:bg-[#1a1a1a]'}`}>
-                          {size}x{size}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold tracking-widest text-zinc-500 uppercase">Tempo (Segundos)</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[60, 120, 180].map(time => (
-                        <button key={time} onClick={() => setDuration(time)} className={`py-3 rounded-lg font-black text-sm transition border ${duration === time ? 'bg-[#00FF00] text-black border-[#00FF00] shadow-[0_0_15px_rgba(0,255,0,0.2)]' : 'bg-[#0a0a0a] text-zinc-400 border-[#222] hover:bg-[#1a1a1a]'}`}>
-                          {time}
-                        </button>
-                      ))}
-                    </div>
+            {/* Room Configuration / Mode Selection */}
+            <div>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-bold text-zinc-100 flex items-center gap-2 uppercase tracking-widest text-xs"><Play size={16} className="text-[#00FF00]" /> Configurar Partida</h3>
+              </div>
+              <div className="space-y-3 mb-5">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-500 uppercase">Tabuleiro</label>
+                  <div className="flex gap-1.5">
+                    {[4, 5, 6, 7, 8].map(size => (
+                      <button key={size} onClick={() => setGridSize(size)} className={`flex-1 py-2 rounded-lg font-black text-xs transition border ${gridSize === size ? 'bg-[#00FF00] text-black border-[#00FF00] shadow-[0_0_15px_rgba(0,255,0,0.2)]' : 'bg-[#0a0a0a] text-zinc-400 border-[#222] hover:bg-[#1a1a1a]'}`}>
+                        {size}x{size}
+                      </button>
+                    ))}
                   </div>
                 </div>
-                
-                <div className="flex flex-col gap-3">
-                  <div className="flex gap-3">
-                    <button onClick={handleCreateRoom} className="flex-1 bg-[#00FF00] text-black px-6 py-4 rounded-xl font-black uppercase tracking-wider text-sm hover:bg-[#00e600] transition shadow-[0_0_20px_rgba(0,255,0,0.2)]">
-                      Criar Sala
-                    </button>
-                    <button onClick={() => onStartOffline && onStartOffline({ gridSize, duration, minWordLength })} className="flex-1 bg-[#1a1a1a] border border-[#00FF00]/30 text-[#00FF00] px-6 py-4 rounded-xl font-bold uppercase tracking-wider text-sm hover:bg-[#222] transition">
-                      Treinar
-                    </button>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-500 uppercase">Tempo (Segundos)</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[60, 120, 180].map(time => (
+                      <button key={time} onClick={() => setDuration(time)} className={`py-2 rounded-lg font-black text-xs transition border ${duration === time ? 'bg-[#00FF00] text-black border-[#00FF00] shadow-[0_0_15px_rgba(0,255,0,0.2)]' : 'bg-[#0a0a0a] text-zinc-400 border-[#222] hover:bg-[#1a1a1a]'}`}>
+                        {time}s
+                      </button>
+                    ))}
                   </div>
-                  <button onClick={async () => {
-                    const id = await createRoom('tv', gridSize, minWordLength, duration);
-                    window.location.href = `/?room=${id}&tv=true`;
-                  }} className="w-full bg-[#0a0a0a] border border-[#333] text-zinc-300 px-6 py-4 rounded-xl font-bold uppercase tracking-wider text-sm hover:bg-[#111] transition flex items-center justify-center gap-3">
-                    <MonitorPlay size={18} /> Iniciar na TV
-                  </button>
                 </div>
               </div>
-
-              <div className="border-t border-[#222] pt-6">
-                <h3 className="font-bold text-zinc-100 mb-4 flex items-center gap-2 uppercase tracking-widest text-sm"><Users size={18} className="text-[#00FF00]" /> Entrar</h3>
-                <div className="flex flex-col gap-4">
-                  <div className="flex gap-2">
-                    <input 
-                      type="text" 
-                      placeholder="ID DA SALA" 
-                      className="flex-1 bg-[#0a0a0a] border border-[#333] text-zinc-100 px-4 py-4 rounded-xl focus:outline-none focus:border-[#00FF00] transition font-mono font-bold uppercase placeholder-zinc-700 text-center tracking-widest"
-                      value={roomIdInput}
-                      onChange={e => setRoomIdInput(e.target.value)}
-                    />
-                    <button 
-                      disabled={!roomIdInput.trim()}
-                      onClick={() => onJoinRoom(roomIdInput.trim())} 
-                      className="bg-[#222] text-zinc-100 px-8 py-4 rounded-xl font-bold hover:bg-[#333] transition uppercase tracking-wider text-sm disabled:opacity-50"
-                    >
-                      Ir
-                    </button>
-                  </div>
-                  
-                  <div className="relative flex items-center">
-                    <div className="flex-grow border-t border-[#222]"></div>
-                    <span className="flex-shrink-0 mx-4 text-zinc-600 text-xs font-black tracking-widest uppercase">OU</span>
-                    <div className="flex-grow border-t border-[#222]"></div>
-                  </div>
-
-                  <button 
-                    onClick={() => setIsScannerOpen(true)}
-                    className="w-full bg-[#111] text-[#00FF00] px-6 py-5 rounded-xl font-black uppercase tracking-widest hover:bg-[#1a1a1a] transition shadow-[0_0_20px_rgba(0,255,0,0.1)] hover:shadow-[0_0_30px_rgba(0,255,0,0.2)] flex items-center justify-center gap-3 border border-[#00FF00]/50"
-                  >
-                    <QrCode size={24} />
-                    ABRIR CÂMERA
+              
+              <div className="flex flex-col gap-2.5">
+                <div className="flex gap-2">
+                  <button onClick={handleCreateRoom} className="flex-1 bg-[#00FF00] text-black px-4 py-3.5 rounded-xl font-black uppercase tracking-wider text-xs hover:bg-[#00e600] transition shadow-[0_0_20px_rgba(0,255,0,0.2)]">
+                    Criar Sala Online
+                  </button>
+                  <button onClick={handleStartTraining} className="flex-1 bg-[#1a1a1a] border border-[#00FF00]/30 text-[#00FF00] px-4 py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-[#222] transition">
+                    Modo Treino
                   </button>
                 </div>
+                <button onClick={async () => {
+                  let activeUser = user;
+                  if (!activeUser) {
+                    activeUser = loginAsGuest(guestNameInput);
+                  }
+                  const id = await createRoom('tv', gridSize, minWordLength, duration);
+                  window.location.href = `/?room=${id}&tv=true`;
+                }} className="w-full bg-[#0a0a0a] border border-[#333] text-zinc-300 px-4 py-3 rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-[#111] transition flex items-center justify-center gap-2">
+                  <MonitorPlay size={16} /> Iniciar na TV
+                </button>
               </div>
             </div>
-          )}
+
+            <div className="border-t border-[#222] pt-4">
+              <h3 className="font-bold text-zinc-100 mb-3 flex items-center gap-2 uppercase tracking-widest text-xs"><Users size={16} className="text-[#00FF00]" /> Entrar em Sala Existente</h3>
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="ID DA SALA" 
+                    className="flex-1 bg-[#0a0a0a] border border-[#333] text-zinc-100 px-4 py-3 rounded-xl focus:outline-none focus:border-[#00FF00] transition font-mono font-bold uppercase placeholder-zinc-700 text-center tracking-widest text-sm"
+                    value={roomIdInput}
+                    onChange={e => setRoomIdInput(e.target.value)}
+                  />
+                  <button 
+                    disabled={!roomIdInput.trim()}
+                    onClick={() => {
+                      if (!user) loginAsGuest(guestNameInput);
+                      onJoinRoom(roomIdInput.trim());
+                    }} 
+                    className="bg-[#222] text-zinc-100 px-6 py-3 rounded-xl font-bold hover:bg-[#333] transition uppercase tracking-wider text-xs disabled:opacity-50"
+                  >
+                    Entrar
+                  </button>
+                </div>
+                
+                <button 
+                  onClick={() => setIsScannerOpen(true)}
+                  className="w-full bg-[#111] text-[#00FF00] px-4 py-3 rounded-xl font-black uppercase tracking-widest hover:bg-[#1a1a1a] transition shadow-[0_0_15px_rgba(0,255,0,0.1)] flex items-center justify-center gap-2 border border-[#00FF00]/50 text-xs"
+                >
+                  <QrCode size={18} />
+                  LER QR CODE DE SALA
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Right Side: Leaderboard */}
