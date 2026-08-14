@@ -1,4 +1,4 @@
-import { checkMasterWordBank } from './wordBank';
+import { checkMasterWordBank, getDictionaryWords } from './wordBank';
 
 export const BOGGLE_DICE_PT = [
   "QBZJXK", "TOUOTO", "OVCGRR", "AAAFSR",
@@ -91,4 +91,44 @@ export function findWordPath(word: string, board: string[], size: number = 4): n
   }
 
   return null;
+}
+
+export async function findAllPossibleWords(board: string[], size: number = 4, minWordLength: number = 3): Promise<{
+  allWords: { word: string; score: number }[];
+  longestWords: string[];
+  shortestWords: string[];
+}> {
+  const dictionary = getDictionaryWords();
+  const validSet = new Set<string>();
+  const maxLen = size * size;
+
+  const candidates = dictionary.filter(w => w.length >= minWordLength && w.length <= maxLen);
+
+  for (let i = 0; i < candidates.length; i++) {
+    const word = candidates[i];
+    if (findWordPath(word, board, size)) {
+      validSet.add(word);
+    }
+  }
+
+  const allWordsList = Array.from(validSet).map(word => ({
+    word,
+    score: Math.max(1, word.length - 2)
+  })).sort((a, b) => b.word.length - a.word.length || a.word.localeCompare(b.word));
+
+  if (allWordsList.length === 0) {
+    return { allWords: [], longestWords: [], shortestWords: [] };
+  }
+
+  const maxLength = allWordsList[0].word.length;
+  const longestWords = allWordsList.filter(item => item.word.length === maxLength).map(item => item.word);
+
+  const minLength = allWordsList[allWordsList.length - 1].word.length;
+  const shortestWords = allWordsList.filter(item => item.word.length === minLength).map(item => item.word);
+
+  return {
+    allWords: allWordsList,
+    longestWords,
+    shortestWords
+  };
 }

@@ -71,6 +71,13 @@ if (typeof window !== 'undefined') {
   loadUspDictionary();
 }
 
+export function getDictionaryWords(): string[] {
+  if (isUspLoaded && uspWordsArray.length > 0) {
+    return uspWordsArray;
+  }
+  return Array.from(BUILTIN_WORDS_SET);
+}
+
 // Retorna o status e total de palavras do IME-USP
 export function getUspDictionaryStats() {
   return {

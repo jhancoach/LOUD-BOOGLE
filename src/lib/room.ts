@@ -3,20 +3,25 @@ import { collection, doc, setDoc, getDoc, updateDoc, arrayUnion, increment, addD
 import { generateBoard } from './boggle';
 
 export const createRoom = async (hostId: string, gridSize: number, minWordLength: number, duration: number) => {
-  const roomRef = doc(collection(db, 'rooms'));
-  const roomId = roomRef.id;
-  
-  await setDoc(roomRef, {
-    hostId,
-    status: 'waiting',
-    board: generateBoard(gridSize),
-    gridSize,
-    minWordLength,
-    duration,
-    endTime: 0
-  });
-  
-  return roomId;
+  try {
+    const roomRef = doc(collection(db, 'rooms'));
+    const roomId = roomRef.id;
+    
+    await setDoc(roomRef, {
+      hostId,
+      status: 'waiting',
+      board: generateBoard(gridSize),
+      gridSize,
+      minWordLength,
+      duration,
+      endTime: 0
+    });
+    
+    return roomId;
+  } catch (error) {
+    console.error("Error creating room:", error);
+    throw error;
+  }
 };
 
 export const joinRoom = async (roomId: string, userId: string, userName: string) => {

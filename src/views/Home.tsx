@@ -24,6 +24,7 @@ export default function Home({ onJoinRoom, onStartOffline }: { onJoinRoom: (id: 
 
   const [topWinners, setTopWinners] = useState<any[]>([]);
   const [topWords, setTopWords] = useState<any[]>([]);
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -129,12 +130,19 @@ export default function Home({ onJoinRoom, onStartOffline }: { onJoinRoom: (id: 
   }
 
   const handleCreateRoom = async () => {
-    let activeUser = user;
-    if (!activeUser) {
-      activeUser = loginAsGuest(guestNameInput);
+    try {
+      setIsCreatingRoom(true);
+      let activeUser = user;
+      if (!activeUser) {
+        activeUser = loginAsGuest(guestNameInput);
+      }
+      const id = await createRoom(activeUser.uid, gridSize, minWordLength, duration);
+      onJoinRoom(id);
+    } catch (error: any) {
+      console.error("Erro ao criar sala:", error);
+      alert("Não foi possível criar a sala. Verifique sua conexão com o Firebase.");
+      setIsCreatingRoom(false);
     }
-    const id = await createRoom(activeUser.uid, gridSize, minWordLength, duration);
-    onJoinRoom(id);
   };
 
   const handleStartTraining = () => {
@@ -268,12 +276,22 @@ export default function Home({ onJoinRoom, onStartOffline }: { onJoinRoom: (id: 
                     ))}
                   </div>
                 </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-500 uppercase">Mínimo de Letras por Palavra</label>
+                  <div className="flex gap-1.5">
+                    {[3, 4, 5, 6, 7, 8].map(len => (
+                      <button key={len} onClick={() => setMinWordLength(len)} className={`flex-1 py-2 rounded-lg font-black text-xs transition border ${minWordLength === len ? 'bg-[#00FF00] text-black border-[#00FF00] shadow-[0_0_15px_rgba(0,255,0,0.2)]' : 'bg-[#0a0a0a] text-zinc-400 border-[#222] hover:bg-[#1a1a1a]'}`}>
+                        {len}+
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               
               <div className="flex flex-col gap-2.5">
                 <div className="flex gap-2">
-                  <button onClick={handleCreateRoom} className="flex-1 bg-[#00FF00] text-black px-4 py-3.5 rounded-xl font-black uppercase tracking-wider text-xs hover:bg-[#00e600] transition shadow-[0_0_20px_rgba(0,255,0,0.2)]">
-                    Criar Sala Online
+                  <button disabled={isCreatingRoom} onClick={handleCreateRoom} className="flex-1 bg-[#00FF00] text-black px-4 py-3.5 rounded-xl font-black uppercase tracking-wider text-xs hover:bg-[#00e600] transition shadow-[0_0_20px_rgba(0,255,0,0.2)] disabled:opacity-50">
+                    {isCreatingRoom ? 'Criando...' : 'Criar Sala Online'}
                   </button>
                   <button onClick={handleStartTraining} className="flex-1 bg-[#1a1a1a] border border-[#00FF00]/30 text-[#00FF00] px-4 py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-[#222] transition">
                     Modo Treino

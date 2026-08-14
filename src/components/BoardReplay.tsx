@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { findWordPath, getScore } from '../lib/boggle';
+import { findWordPath, getScore, findAllPossibleWords } from '../lib/boggle';
 import { playReplayStep, playSelectLetter, playWordSuccess } from '../lib/sounds';
-import { Play, Pause, SkipBack, SkipForward, RotateCcw, FastForward, Sparkles, User, Check, Eye } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, RotateCcw, FastForward, Sparkles, User, Check, Eye, BookOpen, Award, X, ChevronRight, Search } from 'lucide-react';
 
 export interface PlayerWordRecord {
   word: string;
@@ -65,6 +65,32 @@ export default function BoardReplay({ board, gridSize = 4, players, currentUserI
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [activeStepIndex, setActiveStepIndex] = useState<number>(-1); // Which letter in the word is currently active
+
+  const [possibleData, setPossibleData] = useState<{
+    allWords: { word: string; score: number }[];
+    longestWords: string[];
+    shortestWords: string[];
+  }>({ allWords: [], longestWords: [], shortestWords: [] });
+  const [isLoadingPossible, setIsLoadingPossible] = useState<boolean>(true);
+  const [showAllWordsModal, setShowAllWordsModal] = useState<boolean>(false);
+  const [modalSearch, setModalSearch] = useState<string>('');
+
+  useEffect(() => {
+    let isMounted = true;
+    if (board && board.length > 0) {
+      setIsLoadingPossible(true);
+      findAllPossibleWords(board, gridSize, 3).then(res => {
+        if (isMounted) {
+          setPossibleData(res);
+          setIsLoadingPossible(false);
+        }
+      }).catch(err => {
+        console.error("Erro ao calcular palavras possíveis:", err);
+        if (isMounted) setIsLoadingPossible(false);
+      });
+    }
+    return () => { isMounted = false; };
+  }, [board, gridSize]);
 
   // Filtered word list
   const filteredWords = useMemo(() => {
@@ -409,6 +435,104 @@ export default function BoardReplay({ board, gridSize = 4, players, currentUserI
           })}
         </div>
       </div>
+
+      {/* Board Analysis Card */}
+      <div className="bg-[#141414] border border-[#222] p-6 rounded-3xl shadow-xl flex flex-col gap-4 mt-6">
+        <div className="flex items-center justify-between border-b border-[#222] pb-3">
+          <div className="flex items-center gap-2">
+            <Award className="text-[#00FF00]" size={20} />
+            <h3 className="text-sm font-black text-zinc-100 uppercase tracking-widest">Análise Completa do Tabuleiro</h3>
+          </div>
+          <span className="text-[10px] font-black uppercase tracking-widest text-[#00FF00] bg-[#00FF00]/10 px-2.5 py-1 rounded-lg border border-[#00FF00]/30">
+            {isLoadingPossible ? 'Calculando...' : `${possibleData.allWords.length} palavras possíveis`}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div className="bg-[#1a1a1a] p-4 rounded-2xl border border-[#262626]">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block mb-1">🌟 Maior Palavra</span>
+            <span className="font-mono font-black text-base text-[#00FF00] uppercase tracking-wider">
+              {isLoadingPossible ? '...' : (possibleData.longestWords.length > 0 ? possibleData.longestWords.join(', ') : 'Nenhuma')}
+            </span>
+            <span className="text-[10px] text-zinc-400 block mt-1">
+              {possibleData.longestWords[0]?.length || 0} letras
+            </span>
+          </div>
+
+          <div className="bg-[#1a1a1a] p-4 rounded-2xl border border-[#262626]">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block mb-1">✨ Menor Palavra</span>
+            <span className="font-mono font-black text-base text-zinc-200 uppercase tracking-wider">
+              {isLoadingPossible ? '...' : (possibleData.shortestWords.length > 0 ? possibleData.shortestWords.join(', ') : 'Nenhuma')}
+            </span>
+            <span className="text-[10px] text-zinc-400 block mt-1">
+              {possibleData.shortestWords[0]?.length || 0} letras
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setShowAllWordsModal(true)}
+          disabled={isLoadingPossible || possibleData.allWords.length === 0}
+          className="w-full py-3.5 bg-[#1a1a1a] hover:bg-[#222] border border-[#333] text-zinc-200 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition disabled:opacity-50 shadow-md"
+        >
+          <BookOpen size={16} className="text-[#00FF00]" />
+          Ver Todas as {possibleData.allWords.length} Palavras Possíveis do Tabuleiro
+        </button>
+      </div>
+
+      {/* Modal: All Possible Words */}
+      {showAllWordsModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#141414] border border-[#222] w-full max-w-xl max-h-[85vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-[#222] flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-black text-zinc-100 uppercase tracking-widest">Todas as Palavras Possíveis</h3>
+                <p className="text-xs text-zinc-400 font-bold uppercase tracking-wider mt-0.5">Total de {possibleData.allWords.length} palavras válidas neste tabuleiro</p>
+              </div>
+              <button onClick={() => setShowAllWordsModal(false)} className="p-2 bg-[#1a1a1a] text-zinc-400 hover:text-white rounded-xl border border-[#333] transition">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-4 border-b border-[#222]">
+              <div className="relative">
+                <Search size={16} className="absolute left-3.5 top-3.5 text-zinc-500" />
+                <input
+                  type="text"
+                  placeholder="Buscar palavra..."
+                  value={modalSearch}
+                  onChange={(e) => setModalSearch(e.target.value)}
+                  className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl pl-10 pr-4 py-3 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-[#00FF00]"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar max-h-[50vh]">
+              {possibleData.allWords
+                .filter(item => item.word.includes(modalSearch.toUpperCase().trim()))
+                .map((item, idx) => {
+                  const found = allWordRecords.some(r => r.word === item.word);
+                  return (
+                    <div key={item.word} className={`p-3 rounded-xl border flex items-center justify-between ${found ? 'bg-[#1a2e1a]/40 border-[#00FF00]/40 text-[#00FF00]' : 'bg-[#181818] border-[#262626] text-zinc-300'}`}>
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-xs font-black text-zinc-500 w-8">{idx + 1}.</span>
+                        <span className="font-mono font-black uppercase tracking-wider text-sm">{item.word}</span>
+                        {found && (
+                          <span className="text-[9px] font-black uppercase bg-[#00FF00]/20 text-[#00FF00] px-2 py-0.5 rounded border border-[#00FF00]/30">Encontrada</span>
+                        )}
+                      </div>
+                      <span className="font-mono font-black text-xs px-2 py-1 rounded bg-[#222] text-zinc-400">+{item.score} pts</span>
+                    </div>
+                  );
+                })}
+            </div>
+
+            <div className="p-4 border-t border-[#222] bg-[#101010] text-center text-xs text-zinc-500 font-bold uppercase tracking-widest">
+              Dicionário Oficial IME-USP / LOUD Boogle
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
