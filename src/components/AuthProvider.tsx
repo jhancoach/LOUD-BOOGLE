@@ -7,14 +7,35 @@ interface AuthContextType {
   user: any | null;
   loading: boolean;
   profile: any;
+  loginAsGuest: (name: string) => any;
 }
 
-const AuthContext = createContext<AuthContextType>({ user: null, loading: true, profile: null });
+const AuthContext = createContext<AuthContextType>({ user: null, loading: true, profile: null, loginAsGuest: () => {} });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<any | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  const handleLoginAsGuest = (name: string) => {
+    const trimmed = name.trim() || `Convidado_${Math.floor(Math.random() * 9000 + 1000)}`;
+    const guest = {
+      uid: 'guest_' + Math.random().toString(36).substring(2, 9),
+      displayName: trimmed,
+      isGuest: true
+    };
+    localStorage.setItem('boggle_guest_user', JSON.stringify(guest));
+    setUser(guest);
+    const defaultProfile = {
+      name: trimmed,
+      wins: 0,
+      wordsFound: 0,
+      totalScore: 0
+    };
+    setProfile(defaultProfile);
+    setLoading(false);
+    return guest;
+  };
 
   useEffect(() => {
     let unsubProfile: () => void;
@@ -83,7 +104,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, profile }}>
+    <AuthContext.Provider value={{ user, loading, profile, loginAsGuest: handleLoginAsGuest }}>
       {children}
     </AuthContext.Provider>
   );

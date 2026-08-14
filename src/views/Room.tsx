@@ -37,8 +37,8 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
   };
 
   useEffect(() => {
-    if (!user || !profile || isTV) return;
-    joinRoom(roomId, user.uid, profile.name);
+    if (!user || isTV) return;
+    joinRoom(roomId, user.uid, profile?.name || user.displayName || 'Jogador');
   }, [user, profile, roomId, isTV]);
 
   useEffect(() => {
@@ -237,7 +237,20 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  if (!room) return <div className="min-h-screen flex items-center justify-center">Entrando na sala...</div>;
+  if (!room) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 flex flex-col items-center justify-center p-6 text-center">
+        <div className="bg-[#141414] border border-[#222] p-8 rounded-3xl max-w-sm w-full shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col items-center gap-4">
+          <Loader2 size={40} className="text-[#00FF00] animate-spin" />
+          <h2 className="text-xl font-black uppercase tracking-wider text-zinc-100">Entrando na Sala...</h2>
+          <p className="text-xs text-zinc-500 uppercase tracking-widest font-bold">Conectando ao Firestore</p>
+          <button onClick={onLeave} className="mt-4 w-full bg-[#222] hover:bg-[#333] text-zinc-300 font-bold py-3 rounded-xl uppercase tracking-wider text-xs transition">
+            Voltar ao Início
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const currentWord = selectedPath.map((idx) => room.board[idx]).join('');
   const isHost = room.hostId === user?.uid;

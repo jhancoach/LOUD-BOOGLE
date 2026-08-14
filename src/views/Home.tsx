@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../components/AuthProvider';
-import { loginWithGoogle, logout, db, loginAsGuest } from '../lib/firebase';
+import { loginWithGoogle, logout, db } from '../lib/firebase';
 import { createRoom } from '../lib/room';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { Trophy, Users, Play, LogOut, Medal, Star, Clock, QrCode, Gamepad2, X, Edit2, Database, BookOpen, MonitorPlay, ExternalLink, User as UserIcon } from 'lucide-react';
@@ -8,7 +8,7 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 import WordBankModal from '../components/WordBankModal';
 
 export default function Home({ onJoinRoom, onStartOffline }: { onJoinRoom: (id: string) => void, onStartOffline?: (settings: { gridSize: number, duration: number, minWordLength: number }) => void }) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, loginAsGuest } = useAuth();
   const [roomIdInput, setRoomIdInput] = useState('');
   const [gridSize, setGridSize] = useState(4);
   const [minWordLength, setMinWordLength] = useState(3);

@@ -58,7 +58,6 @@ export const loginAsGuest = (name: string): GuestUser => {
     isGuest: true
   };
   localStorage.setItem('boggle_guest_user', JSON.stringify(guest));
-  window.location.reload();
   return guest;
 };
 
