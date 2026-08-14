@@ -1,0 +1,6 @@
+{
+  "name": "LOUD BOOGLE",
+  "description": "Um jogo online de caça-palavras multiplayer inspirado no Boggle com a identidade da LOUD.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,37 @@
+{
+  "collections": [
+    {
+      "name": "users",
+      "description": "Global user profiles and rankings.",
+      "fields": {
+        "name": "string",
+        "wins": "number",
+        "wordsFound": "number",
+        "totalScore": "number"
+      }
+    },
+    {
+      "name": "rooms",
+      "description": "Multiplayer game rooms.",
+      "fields": {
+        "hostId": "string",
+        "status": "string",
+        "board": "array",
+        "gridSize": "number",
+        "minWordLength": "number",
+        "endTime": "number"
+      },
+      "subcollections": [
+        {
+          "name": "players",
+          "description": "Players in a room and their scores.",
+          "fields": {
+            "name": "string",
+            "score": "number",
+            "words": "array"
+          }
+        }
+      ]
+    }
+  ]
+}
