@@ -7,7 +7,7 @@ export const createRoom = async (hostId: string, gridSize: number, minWordLength
     const roomRef = doc(collection(db, 'rooms'));
     const roomId = roomRef.id;
     
-    await setDoc(roomRef, {
+    const setPromise = setDoc(roomRef, {
       hostId,
       status: 'waiting',
       board: generateBoard(gridSize),
@@ -16,6 +16,12 @@ export const createRoom = async (hostId: string, gridSize: number, minWordLength
       duration,
       endTime: 0
     });
+
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout ao conectar com o servidor')), 6000)
+    );
+
+    await Promise.race([setPromise, timeoutPromise]);
     
     return roomId;
   } catch (error) {

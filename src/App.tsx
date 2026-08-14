@@ -16,7 +16,6 @@ export default function App() {
     if (roomParam) {
       setCurrentRoomId(roomParam);
       setIsTVMode(tvParam === 'true');
-      window.history.replaceState({}, '', '/'); // Clean URL
     }
   }, []);
 

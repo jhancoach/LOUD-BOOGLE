@@ -27,6 +27,16 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | 'info'; word?: string } | null>(null);
   const [muted, setMuted] = useState(isAudioMuted());
   const [tvGameOverTab, setTvGameOverTab] = useState<'podium' | 'replay'>('replay');
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!room) {
+        setLoadTimedOut(true);
+      }
+    }, 7000);
+    return () => clearTimeout(timer);
+  }, [room]);
 
   const boardRef = useRef<HTMLDivElement>(null);
   const lastTickRef = useRef<number>(-1);
@@ -240,11 +250,37 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
   if (!room) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 flex flex-col items-center justify-center p-6 text-center">
-        <div className="bg-[#141414] border border-[#222] p-8 rounded-3xl max-w-sm w-full shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col items-center gap-4">
-          <Loader2 size={40} className="text-[#00FF00] animate-spin" />
-          <h2 className="text-xl font-black uppercase tracking-wider text-zinc-100">Entrando na Sala...</h2>
-          <p className="text-xs text-zinc-500 uppercase tracking-widest font-bold">Conectando ao Firestore</p>
-          <button onClick={onLeave} className="mt-4 w-full bg-[#222] hover:bg-[#333] text-zinc-300 font-bold py-3 rounded-xl uppercase tracking-wider text-xs transition">
+        <div className="bg-[#141414] border border-[#222] p-8 rounded-3xl max-w-md w-full shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col items-center gap-4">
+          {!loadTimedOut ? (
+            <>
+              <Loader2 size={40} className="text-[#00FF00] animate-spin" />
+              <h2 className="text-xl font-black uppercase tracking-wider text-zinc-100">Entrando na Sala...</h2>
+              <p className="text-xs text-zinc-500 uppercase tracking-widest font-bold">Conectando ao Firestore</p>
+            </>
+          ) : (
+            <>
+              <X size={40} className="text-red-500" />
+              <h2 className="text-xl font-black uppercase tracking-wider text-zinc-100">Demorou para conectar</h2>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Isso pode acontecer se o navegador bloquear cookies/armazenamento de terceiros (comum no Safari/iOS em iframes) ou se a sala não existir.
+              </p>
+              <div className="flex flex-col gap-2 w-full mt-2">
+                <button 
+                  onClick={() => window.open(window.location.href, '_blank')} 
+                  className="w-full bg-[#00FF00] hover:bg-[#00dd00] text-black font-black py-3 rounded-xl uppercase tracking-wider text-xs transition"
+                >
+                  Abrir em Nova Aba
+                </button>
+                <button 
+                  onClick={() => window.location.reload()} 
+                  className="w-full bg-[#222] hover:bg-[#333] text-zinc-200 font-bold py-3 rounded-xl uppercase tracking-wider text-xs transition"
+                >
+                  Tentar Novamente
+                </button>
+              </div>
+            </>
+          )}
+          <button onClick={onLeave} className="mt-2 w-full bg-transparent hover:bg-[#1a1a1a] text-zinc-400 font-bold py-2 rounded-xl uppercase tracking-wider text-xs transition border border-[#262626]">
             Voltar ao Início
           </button>
         </div>
