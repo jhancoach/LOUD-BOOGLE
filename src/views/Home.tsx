@@ -251,7 +251,7 @@ export default function Home({ onJoinRoom, onStartOffline }: { onJoinRoom: (id: 
 
                 <div className="flex items-center gap-3 md:gap-4">
                   <div className="w-10 h-10 md:w-12 md:h-12 bg-[#00FF00] rounded-full flex items-center justify-center text-black font-black text-lg md:text-xl uppercase shadow-[0_0_20px_rgba(0,255,0,0.3)] border-2 border-black/10">
-                    {profile?.name?.[0] || user.uid[0]}
+                    {(profile?.name?.[0] || user?.displayName?.[0] || user?.uid?.[0] || '?')}
                   </div>
                   <div className="flex-1 overflow-hidden">
                     <h2 className="font-black text-zinc-100 text-sm md:text-base uppercase tracking-wider truncate">{profile?.name || 'Jogador'}</h2>
@@ -397,7 +397,7 @@ export default function Home({ onJoinRoom, onStartOffline }: { onJoinRoom: (id: 
                     disabled={!roomIdInput.trim()}
                     onClick={() => {
                       if (!user) loginAsGuest(guestNameInput);
-                      onJoinRoom(roomIdInput.trim());
+                      onJoinRoom(roomIdInput.trim().toUpperCase());
                     }} 
                     className="bg-[#222] text-zinc-100 px-4 sm:px-6 py-3 rounded-xl font-bold hover:bg-[#333] transition uppercase tracking-wider text-[11px] disabled:opacity-50"
                   >

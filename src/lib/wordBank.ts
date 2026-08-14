@@ -238,16 +238,25 @@ export async function checkMasterWordBank(word: string, minLength: number = 3): 
     }
   }
 
-  // 5. Fallback para API externa
+  // 5. Fallback para API externa com proteção de Timeout e Rate Limit
   try {
-    const res = await fetch(`https://api.dicionario-aberto.net/word/${clean.toLowerCase()}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1200);
+    
+    const res = await fetch(`https://api.dicionario-aberto.net/word/${clean.toLowerCase()}`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data) && data.length > 0 && data[0]?.word) {
         return data[0].word.toUpperCase();
       }
     }
-  } catch (e) {}
+  } catch (e) {
+    // Silently ignore network timeouts, CORS or 429 rate-limit errors from third-party API
+  }
 
   return null;
 }

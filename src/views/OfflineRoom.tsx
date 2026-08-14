@@ -194,9 +194,9 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
 
   // Mock player object for Replay compatibility
   const soloPlayer = [{
-    id: user?.uid || 'solo',
-    name: profile?.name || user?.displayName || 'Você',
-    words: words.map(w => w.word),
+    id: (user?.uid || 'solo') as string,
+    name: (profile?.name || user?.displayName || 'Você') as string,
+    words: words,
     score: totalScore
   }];
 
