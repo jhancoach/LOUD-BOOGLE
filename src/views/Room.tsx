@@ -205,39 +205,12 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
     });
   };
 
-  const handlePointerDown = (index: number, e: React.PointerEvent) => {
-    if (room?.status !== 'playing' || isChecking) return;
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-    setIsDragging(true);
-    playSelectLetter(0);
-    setSelectedPath([index]);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging || room?.status !== 'playing' || isChecking) return;
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    if (el) {
-      const indexStr = el.getAttribute('data-index');
-      if (indexStr !== null) {
-        handleCellEnter(parseInt(indexStr, 10));
-      }
-    }
-  };
-
-  const handlePointerUp = async () => {
-    if (!isDragging || room?.status !== 'playing') return;
-    setIsDragging(false);
-
-    if (selectedPath.length < (room.minWordLength || 3)) {
-      setSelectedPath([]);
-      if (selectedPath.length > 0) {
-        playWordError();
-        showMessage(`Mínimo ${room.minWordLength || 3} letras`, 'info');
-      }
+  const submitWordFromPath = async (pathToSubmit: number[]) => {
+    if (pathToSubmit.length < (room?.minWordLength || 3) || room?.status !== 'playing' || isChecking) {
       return;
     }
 
-    const word = selectedPath.map((idx) => room?.board?.[idx] || '').join('');
+    const word = pathToSubmit.map((idx) => room?.board?.[idx] || '').join('');
     const myPlayerInfo = players.find(p => p.id === user?.uid);
     
     if (myPlayerInfo?.words?.some((w: any) => (typeof w === 'string' ? w : w.word) === word)) {
@@ -248,7 +221,7 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
     }
 
     setIsChecking(true);
-    const canonical = await validateWord(word, room.minWordLength || 3);
+    const canonical = await validateWord(word, room?.minWordLength || 3);
     
     if (canonical && user) {
       const score = getScore(word);
@@ -262,6 +235,86 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
     
     setIsChecking(false);
     setSelectedPath([]);
+  };
+
+  const handlePointerDown = (index: number, e: React.PointerEvent | React.TouchEvent) => {
+    if (room?.status !== 'playing' || isChecking) return;
+    
+    if ('pointerId' in e && e.target) {
+      try {
+        const target = e.target as HTMLElement;
+        if (typeof target.releasePointerCapture === 'function') {
+          target.releasePointerCapture(e.pointerId);
+        }
+      } catch {
+        // ignore capture errors on mobile
+      }
+    }
+
+    setIsDragging(true);
+
+    setSelectedPath((prevPath) => {
+      // If clicking the last letter again when word is valid, submit word
+      if (prevPath.length > 0 && prevPath[prevPath.length - 1] === index && prevPath.length >= (room?.minWordLength || 3)) {
+        setTimeout(() => submitWordFromPath(prevPath), 0);
+        return prevPath;
+      }
+
+      // If clicking the second-to-last letter, backspace 1 letter
+      if (prevPath.length >= 2 && prevPath[prevPath.length - 2] === index) {
+        playSelectLetter(Math.max(0, prevPath.length - 2));
+        return prevPath.slice(0, -1);
+      }
+
+      if (prevPath.includes(index)) return prevPath;
+
+      if (prevPath.length === 0) {
+        playSelectLetter(0);
+        return [index];
+      }
+
+      const lastIndex = prevPath[prevPath.length - 1];
+      if (isAdjacent(lastIndex, index, room.gridSize)) {
+        playSelectLetter(prevPath.length);
+        return [...prevPath, index];
+      }
+
+      // Tapping a non-adjacent tile starts a new selection
+      playSelectLetter(0);
+      return [index];
+    });
+  };
+
+  const handleCellEnterFromCoords = (clientX: number, clientY: number) => {
+    if (!isDragging || room?.status !== 'playing' || isChecking) return;
+    const el = document.elementFromPoint(clientX, clientY);
+    if (!el) return;
+    const tile = el.closest('[data-index]');
+    if (tile) {
+      const indexStr = tile.getAttribute('data-index');
+      if (indexStr !== null) {
+        handleCellEnter(parseInt(indexStr, 10));
+      }
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    handleCellEnterFromCoords(e.clientX, e.clientY);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches && e.touches.length > 0) {
+      handleCellEnterFromCoords(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  };
+
+  const handlePointerUp = async () => {
+    if (!isDragging || room?.status !== 'playing') return;
+    setIsDragging(false);
+
+    if (selectedPath.length >= (room?.minWordLength || 3)) {
+      await submitWordFromPath(selectedPath);
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -758,9 +811,13 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
           <div 
             ref={boardRef}
             className="bg-[#141414] p-3 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-[#222] select-none touch-none mb-4 relative overflow-hidden"
+            style={{ touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handlePointerUp}
+            onTouchCancel={handlePointerUp}
           >
             {room.status === 'waiting' && (
               <div className="absolute inset-0 z-20 bg-[#0a0a0a]/98 backdrop-blur-md rounded-2xl flex flex-col p-4 overflow-y-auto custom-scrollbar">
@@ -933,9 +990,11 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
                     key={index}
                     data-index={index}
                     onPointerDown={(e) => handlePointerDown(index, e)}
+                    onTouchStart={(e) => handlePointerDown(index, e)}
                     onPointerEnter={() => handleCellEnter(index)}
+                    style={{ touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
                     className={`
-                      flex items-center justify-center font-black uppercase rounded-2xl md:rounded-[1.5rem] transition-all duration-150 cursor-pointer touch-none ${textSizeClass}
+                      flex items-center justify-center font-black uppercase rounded-2xl md:rounded-[1.5rem] transition-all duration-150 cursor-pointer touch-none select-none ${textSizeClass}
                       ${isSelected 
                         ? 'bg-[#00FF00] text-black shadow-[0_4px_0_0_#00cc00] translate-y-0.5' 
                         : 'bg-[#2D164D] text-white hover:bg-[#3d1e66] shadow-[0_6px_0_0_#1a0d2d] active:translate-y-1 active:shadow-[0_2px_0_0_#1a0d2d] border border-[#4a247f]/30'
@@ -952,10 +1011,29 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
 
           <div className="h-20 flex items-center justify-center bg-[#141414] rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-[#222]">
              {isPlaying && (
-                <div className="text-center w-full">
-                  <div className={`text-3xl font-black tracking-widest ${isChecking ? 'text-zinc-500' : 'text-[#00FF00] drop-shadow-[0_0_10px_rgba(0,255,0,0.3)]'} flex items-center justify-center gap-3 h-10 uppercase`}>
+                <div className="text-center w-full px-3">
+                  <div className={`text-2xl sm:text-3xl font-black tracking-widest ${isChecking ? 'text-zinc-500' : 'text-[#00FF00] drop-shadow-[0_0_10px_rgba(0,255,0,0.3)]'} flex items-center justify-center gap-2 sm:gap-3 h-10 uppercase`}>
                     {currentWord || <span className="text-[#333]">___</span>}
                     {isChecking && <Loader2 size={24} className="animate-spin text-zinc-500" />}
+                    
+                    {selectedPath.length > 0 && !isChecking && (
+                      <div className="flex items-center gap-1.5 ml-2">
+                        <button 
+                          onClick={() => setSelectedPath([])}
+                          className="px-2 py-1 bg-[#222] hover:bg-[#333] text-zinc-400 rounded-lg text-[10px] font-black uppercase tracking-wider border border-[#333] transition"
+                        >
+                          LIMPAR
+                        </button>
+                        {selectedPath.length >= (room?.minWordLength || 3) && (
+                          <button 
+                            onClick={() => submitWordFromPath(selectedPath)}
+                            className="px-2.5 py-1 bg-[#00FF00] hover:bg-[#00e600] text-black rounded-lg text-[10px] font-black uppercase tracking-wider shadow-[0_0_10px_rgba(0,255,0,0.4)] transition"
+                          >
+                            ENVIAR
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="h-6 mt-1 flex items-center justify-center">
                     {message && (

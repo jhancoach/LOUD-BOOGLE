@@ -122,48 +122,10 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
     setMessage({ text: 'Palavra sugerida com sucesso!', type: 'success' });
   };
 
-  const handlePointerDown = (e: React.PointerEvent, index: number, letter: string) => {
-    if (status !== 'playing' || timeLeft === 0) return;
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-    playSelectLetter(0);
-    setCurrentWord([{ index, letter }]);
-    setMessage(null);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (status !== 'playing' || timeLeft === 0 || currentWord.length === 0) return;
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    if (el) {
-      const indexStr = el.getAttribute('data-index');
-      const letterStr = el.getAttribute('data-letter');
-      if (indexStr !== null && letterStr !== null) {
-        handlePointerEnter(parseInt(indexStr, 10), letterStr);
-      }
-    }
-  };
-
-  const handlePointerEnter = (index: number, letter: string) => {
-    if (status !== 'playing' || timeLeft === 0 || currentWord.length === 0) return;
-    const lastIndex = currentWord[currentWord.length - 1].index;
+  const submitOfflineWord = async (wordList: { index: number; letter: string }[]) => {
+    if (status !== 'playing' || timeLeft === 0 || wordList.length === 0) return;
     
-    if (currentWord.some(w => w.index === index)) {
-      if (currentWord.length > 1 && currentWord[currentWord.length - 2].index === index) {
-        setCurrentWord(prev => prev.slice(0, -1));
-        playSelectLetter(currentWord.length - 2);
-      }
-      return;
-    }
-
-    if (isAdjacent(lastIndex, index, gridSize)) {
-      playSelectLetter(currentWord.length);
-      setCurrentWord(prev => [...prev, { index, letter }]);
-    }
-  };
-
-  const handlePointerUp = async () => {
-    if (status !== 'playing' || timeLeft === 0 || currentWord.length === 0) return;
-    
-    const wordStr = currentWord.map(w => w.letter).join('');
+    const wordStr = wordList.map(w => w.letter).join('');
     setCurrentWord([]);
 
     if (wordStr.length < minWordLength) {
@@ -187,6 +149,107 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
     } else {
       playWordError();
       setMessage({ text: 'Palavra não encontrada.', type: 'error', word: wordStr });
+    }
+  };
+
+  const handlePointerDown = (e: React.PointerEvent | React.TouchEvent, index: number, letter: string) => {
+    if (status !== 'playing' || timeLeft === 0) return;
+    
+    if ('pointerId' in e && e.target) {
+      try {
+        const target = e.target as HTMLElement;
+        if (typeof target.releasePointerCapture === 'function') {
+          target.releasePointerCapture(e.pointerId);
+        }
+      } catch {
+        // ignore capture errors
+      }
+    }
+
+    playSelectLetter(0);
+    setMessage(null);
+
+    setCurrentWord(prev => {
+      // If clicking last letter again and word is valid, submit
+      if (prev.length > 0 && prev[prev.length - 1].index === index && prev.length >= minWordLength) {
+        setTimeout(() => submitOfflineWord(prev), 0);
+        return prev;
+      }
+
+      // Backspace if clicking second-to-last
+      if (prev.length >= 2 && prev[prev.length - 2].index === index) {
+        playSelectLetter(Math.max(0, prev.length - 2));
+        return prev.slice(0, -1);
+      }
+
+      if (prev.some(w => w.index === index)) return prev;
+
+      if (prev.length === 0) {
+        return [{ index, letter }];
+      }
+
+      const lastIndex = prev[prev.length - 1].index;
+      if (isAdjacent(lastIndex, index, gridSize)) {
+        playSelectLetter(prev.length);
+        return [...prev, { index, letter }];
+      }
+
+      // Tapping a non-adjacent tile starts a new selection
+      return [{ index, letter }];
+    });
+  };
+
+  const handleCellEnterFromCoords = (clientX: number, clientY: number) => {
+    if (status !== 'playing' || timeLeft === 0) return;
+    const el = document.elementFromPoint(clientX, clientY);
+    if (!el) return;
+    const tile = el.closest('[data-index]');
+    if (tile) {
+      const indexStr = tile.getAttribute('data-index');
+      const letterStr = tile.getAttribute('data-letter');
+      if (indexStr !== null && letterStr !== null) {
+        handlePointerEnter(parseInt(indexStr, 10), letterStr);
+      }
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    handleCellEnterFromCoords(e.clientX, e.clientY);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches && e.touches.length > 0) {
+      handleCellEnterFromCoords(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  };
+
+  const handlePointerEnter = (index: number, letter: string) => {
+    if (status !== 'playing' || timeLeft === 0) return;
+    setCurrentWord(prev => {
+      if (prev.length === 0) return prev;
+      const lastIndex = prev[prev.length - 1].index;
+      
+      if (prev.some(w => w.index === index)) {
+        if (prev.length > 1 && prev[prev.length - 2].index === index) {
+          playSelectLetter(Math.max(0, prev.length - 2));
+          return prev.slice(0, -1);
+        }
+        return prev;
+      }
+
+      if (isAdjacent(lastIndex, index, gridSize)) {
+        playSelectLetter(prev.length);
+        return [...prev, { index, letter }];
+      }
+
+      return prev;
+    });
+  };
+
+  const handlePointerUp = async () => {
+    if (status !== 'playing' || timeLeft === 0 || currentWord.length === 0) return;
+    if (currentWord.length >= minWordLength) {
+      await submitOfflineWord(currentWord);
     }
   };
 
@@ -246,8 +309,24 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
               
               <div className="mb-4 h-12 flex items-center justify-center w-full">
                 {currentWord.length > 0 ? (
-                  <div className="text-3xl font-black tracking-widest uppercase text-[#00FF00] drop-shadow-[0_0_10px_rgba(0,255,0,0.2)]">
-                    {currentWord.map(w => w.letter).join('')}
+                  <div className="text-3xl font-black tracking-widest uppercase text-[#00FF00] drop-shadow-[0_0_10px_rgba(0,255,0,0.2)] flex items-center justify-center gap-2">
+                    <span>{currentWord.map(w => w.letter).join('')}</span>
+                    <div className="flex items-center gap-1.5 ml-2">
+                      <button 
+                        onClick={() => setCurrentWord([])}
+                        className="px-2 py-1 bg-[#222] hover:bg-[#333] text-zinc-400 rounded-lg text-[10px] font-black uppercase tracking-wider border border-[#333] transition"
+                      >
+                        LIMPAR
+                      </button>
+                      {currentWord.length >= minWordLength && (
+                        <button 
+                          onClick={() => submitOfflineWord(currentWord)}
+                          className="px-2.5 py-1 bg-[#00FF00] hover:bg-[#00e600] text-black rounded-lg text-[10px] font-black uppercase tracking-wider shadow-[0_0_10px_rgba(0,255,0,0.4)] transition"
+                        >
+                          ENVIAR
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ) : message ? (
                   <div className={`flex items-center gap-2 font-black px-4 py-2 rounded-xl text-sm uppercase tracking-widest border ${message.type === 'error' ? 'bg-red-900/20 text-red-500 border-red-500/30' : 'bg-[#00FF00]/10 text-[#00FF00] border-[#00FF00]/30'}`}>
@@ -266,11 +345,14 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
 
               <div 
                 ref={boardRef}
-                className="grid gap-2 md:gap-3 bg-[#0a0a0a] p-4 md:p-6 rounded-3xl touch-none border border-[#222] shadow-inner aspect-square w-full max-w-xl mx-auto"
-                style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}
+                className="grid gap-2 md:gap-3 bg-[#0a0a0a] p-4 md:p-6 rounded-3xl touch-none select-none border border-[#222] shadow-inner aspect-square w-full max-w-xl mx-auto"
+                style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`, touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
                 onPointerMove={handlePointerMove}
                 onPointerLeave={handlePointerUp}
                 onPointerUp={handlePointerUp}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handlePointerUp}
+                onTouchCancel={handlePointerUp}
               >
                 {board.map((letter: string, index: number) => {
                   const isSelected = currentWord.some(w => w.index === index);
@@ -283,9 +365,11 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
                       data-index={index}
                       data-letter={letter}
                       onPointerDown={(e) => handlePointerDown(e, index, letter)}
+                      onTouchStart={(e) => handlePointerDown(e, index, letter)}
                       onPointerEnter={() => handlePointerEnter(index, letter)}
+                      style={{ touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
                       className={`
-                        flex items-center justify-center font-black uppercase rounded-2xl cursor-pointer select-none transition-all shadow-[0_4px_0_0_rgba(0,0,0,0.8)] ${textSizeClass}
+                        flex items-center justify-center font-black uppercase rounded-2xl cursor-pointer select-none touch-none transition-all shadow-[0_4px_0_0_rgba(0,0,0,0.8)] ${textSizeClass}
                         ${isSelected ? 'bg-[#00FF00] text-black shadow-none translate-y-1' : 'bg-[#1a1a1a] text-zinc-100 hover:bg-[#222] border border-[#333] active:translate-y-1 active:shadow-none'}
                         ${isLast ? 'ring-4 ring-white/50' : ''}
                       `}
