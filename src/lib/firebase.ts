@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth, signInAnonymously, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
@@ -17,16 +17,8 @@ export const loginWithGoogle = async () => {
       await signInWithRedirect(auth, provider);
     } catch (redirectError: any) {
       console.error("Error signing in with Google redirect", redirectError);
-      alert("Não foi possível abrir o login do Google no iframe. Por favor, clique em 'Jogar como Convidado' ou abra o aplicativo em uma nova aba.");
+      alert("Não foi possível abrir o login do Google no iframe. Por favor, abra o aplicativo em uma nova aba.");
     }
-  }
-};
-
-export const loginAnonymously = async () => {
-  try {
-    await signInAnonymously(auth);
-  } catch (error) {
-    console.error("Error signing in anonymously", error);
   }
 };
 
@@ -36,5 +28,38 @@ export const logout = async () => {
   } catch (error) {
     console.error("Error signing out", error);
   }
+  localStorage.removeItem('boggle_guest_user');
+  window.location.reload();
 };
+
+export interface GuestUser {
+  uid: string;
+  displayName: string;
+  isGuest: boolean;
+}
+
+export const getGuestUser = (): GuestUser | null => {
+  const stored = localStorage.getItem('boggle_guest_user');
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+export const loginAsGuest = (name: string): GuestUser => {
+  const trimmed = name.trim() || `Convidado_${Math.floor(Math.random() * 9000 + 1000)}`;
+  const guest: GuestUser = {
+    uid: 'guest_' + Math.random().toString(36).substring(2, 9),
+    displayName: trimmed,
+    isGuest: true
+  };
+  localStorage.setItem('boggle_guest_user', JSON.stringify(guest));
+  window.location.reload();
+  return guest;
+};
+
 
