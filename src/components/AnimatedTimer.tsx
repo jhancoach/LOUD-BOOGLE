@@ -1,17 +1,20 @@
 import React from 'react';
+import { Hourglass } from 'lucide-react';
 
 interface AnimatedTimerProps {
   timeLeft: number;
   totalDuration: number;
   size?: 'sm' | 'md' | 'lg' | 'tv';
   showProgressRing?: boolean;
+  variant?: 'ring' | 'pill';
 }
 
 export default function AnimatedTimer({
   timeLeft,
   totalDuration,
   size = 'md',
-  showProgressRing = true
+  showProgressRing = true,
+  variant = 'ring'
 }: AnimatedTimerProps) {
   const safeTotal = Math.max(totalDuration || 180, 1);
   const fraction = Math.max(0, Math.min(1, timeLeft / safeTotal));
@@ -53,6 +56,27 @@ export default function AnimatedTimer({
     : isWarning
     ? '#f59e0b'
     : '#00FF00';
+
+  if (variant === 'pill') {
+    const isTV = size === 'tv';
+    return (
+      <div className={`flex items-center gap-2 ${isTV ? 'bg-black/30 backdrop-blur-md border-white/20 px-8 py-3 rounded-full' : 'bg-[#141414] border-[#333] px-3 md:px-5 py-1.5 md:py-2 rounded-full'} border-2 shadow-2xl relative overflow-hidden group ${isUrgent ? 'animate-pulse scale-105 border-red-500/50' : ''}`}>
+        {/* Progress bar background */}
+        <div 
+          className="absolute left-0 bottom-0 h-1 bg-[#00FF00]/20 transition-all duration-1000 ease-linear"
+          style={{ width: `${fraction * 100}%`, backgroundColor: strokeHex + (isTV ? '66' : '33') }}
+        />
+        <Hourglass size={isTV ? 28 : size === 'sm' ? 14 : 18} className={`${colorClass} ${isUrgent ? 'animate-spin-slow' : ''}`} />
+        <span
+          className={`font-mono font-black tabular-nums transition-all duration-300 ${colorClass} ${glowClass} ${
+            isTV ? 'text-5xl' : 'text-base md:text-xl'
+          }`}
+        >
+          {formattedTime}
+        </span>
+      </div>
+    );
+  }
 
   if (!showProgressRing) {
     return (

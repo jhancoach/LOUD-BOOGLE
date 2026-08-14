@@ -275,7 +275,7 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
                 {board.map((letter: string, index: number) => {
                   const isSelected = currentWord.some(w => w.index === index);
                   const isLast = currentWord.length > 0 && currentWord[currentWord.length - 1].index === index;
-                  const textSizeClass = gridSize === 4 ? 'text-3xl md:text-4xl' : gridSize === 5 ? 'text-2xl md:text-3xl' : gridSize === 6 ? 'text-xl md:text-2xl' : 'text-lg md:text-xl';
+                  const textSizeClass = gridSize === 4 ? 'text-3xl md:text-4xl' : gridSize === 5 ? 'text-2xl md:text-3xl' : gridSize === 6 ? 'text-xl md:text-2xl' : gridSize === 7 ? 'text-lg md:text-xl' : 'text-sm md:text-base';
                   
                   return (
                     <div 

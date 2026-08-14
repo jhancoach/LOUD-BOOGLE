@@ -4,7 +4,7 @@ import { db } from '../lib/firebase';
 import { doc, collection, onSnapshot, query, updateDoc } from 'firebase/firestore';
 import { joinRoom, startGame, addWordToPlayer, saveFinalStats, resetPlayer, restartGame, suggestWord, updateRoomSettings, transferHost } from '../lib/room';
 import { isAdjacent, validateWord, generateBoard, getScore } from '../lib/boggle';
-import { Play, Loader2, Check, X, ArrowLeft, Trophy, Users, Clock, Crown, QrCode, MonitorPlay, Settings, Menu, Smile, BookOpen, Medal, Hourglass, User, Database, Share2, Sparkles, Volume2, VolumeX, Eye } from 'lucide-react';
+import { Play, Loader2, Check, X, ArrowLeft, Trophy, Users, Clock, Crown, QrCode, MonitorPlay, Settings, Menu, Smile, BookOpen, Medal, Hourglass, User, Database, Share2, Sparkles, Volume2, VolumeX, Eye, Minus, Plus } from 'lucide-react';
 import WordBankModal from '../components/WordBankModal';
 import AnimatedTimer from '../components/AnimatedTimer';
 import QRGenerator from '../components/QRGenerator';
@@ -313,145 +313,168 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
   const joinUrl = `${window.location.origin}/?room=${roomId}`;
 
   if (isTV) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans flex flex-col items-center relative overflow-hidden">
-        
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#00FF00]/5 blur-[120px] pointer-events-none rounded-full"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#00FF00]/5 blur-[120px] pointer-events-none rounded-full"></div>
+    const leftPlayers = computedPlayers.filter((_, i) => i % 2 === 0);
+    const rightPlayers = computedPlayers.filter((_, i) => i % 2 !== 0);
 
-        {/* Header */}
-        <div className="w-full flex justify-between items-center p-8 relative z-10">
-          <div className="flex flex-col items-start">
-            <h1 className="text-4xl md:text-5xl font-black text-[#00FF00] tracking-widest drop-shadow-[0_0_15px_rgba(0,255,0,0.3)]">LOUD</h1>
-            <h2 className="text-xl font-black tracking-[0.35em] uppercase text-zinc-100">BOOGLE</h2>
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#d946ef] via-[#ec4899] to-[#f43f5e] text-zinc-100 font-sans flex flex-col items-center relative overflow-hidden p-8">
+        
+        {/* Background Decorative Elements */}
+        <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-white/10 blur-[120px] rounded-full"></div>
+        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-yellow-400/10 blur-[120px] rounded-full"></div>
+
+        {/* Top Header with Timer and Info */}
+        <div className="w-full flex justify-center items-start relative z-20 mb-8">
+          <div className="flex flex-col items-center">
+            {room.status === 'playing' ? (
+              <AnimatedTimer
+                timeLeft={timeLeft}
+                totalDuration={room.duration || 180}
+                size="tv"
+                variant="pill"
+              />
+            ) : (
+              <div className="bg-white/10 backdrop-blur-md px-8 py-4 rounded-full border border-white/20 shadow-2xl flex items-center gap-4">
+                <Trophy className="text-yellow-400" size={32} />
+                <span className="text-3xl font-black uppercase tracking-widest">
+                  {room.status === 'waiting' ? 'Aguardando Jogadores' : 'Fim de Jogo'}
+                </span>
+              </div>
+            )}
           </div>
-          <QRGenerator 
-            value={joinUrl} 
-            size={70} 
-            title="Entrar pelo Celular"
-            subtitle="Aponte a câmera"
-            showShareButtons={false}
-          />
+
+          <div className="absolute right-0 top-0 flex flex-col items-end">
+            <div className="bg-black/20 backdrop-blur-sm p-4 rounded-2xl border border-white/10 flex items-center gap-3">
+               <div className="bg-yellow-400 text-black p-2 rounded-lg font-black text-xl shadow-lg">
+                 {room.gridSize}
+               </div>
+               <div className="text-right">
+                 <p className="text-[10px] font-black uppercase tracking-widest text-white/60">Modo de Jogo</p>
+                 <p className="text-sm font-black uppercase tracking-wider">Grade {room.gridSize}x{room.gridSize}</p>
+               </div>
+            </div>
+          </div>
         </div>
 
-        {/* Main Area */}
-        <div className="flex-1 w-full max-w-7xl flex flex-col justify-center items-center -mt-6 px-8 relative z-10">
-          {room.status === 'waiting' && (
-            <div className="text-center animate-in fade-in zoom-in duration-500 max-w-md w-full">
-              <QRGenerator
-                value={joinUrl}
-                size={220}
-                title="SALA CRIADA"
-                subtitle="Escaneie com a câmera do celular para entrar agora"
-                showShareButtons={true}
-              />
-              <h2 className="text-3xl font-black mt-6 mb-2 uppercase tracking-wider text-zinc-100 drop-shadow-md">Aguardando Início...</h2>
-              <p className="text-xl text-[#00FF00] flex items-center justify-center gap-3 font-bold uppercase tracking-widest text-sm"><Users size={24} /> {players.length} jogadores conectados</p>
-            </div>
-          )}
-
-          {isPlaying && (
-            <div className="flex flex-row gap-20 items-center w-full justify-center">
-              {/* Board */}
-              <div 
-                className="grid gap-3 md:gap-4 bg-[#141414] p-8 rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-[#222] aspect-square max-w-[650px] w-full"
-                style={{ gridTemplateColumns: `repeat(${room.gridSize}, minmax(0, 1fr))` }}
-              >
-                {(room.board || []).map((letter: string, index: number) => {
-                  const textSizeClass = room.gridSize === 4 ? 'text-5xl md:text-6xl' : room.gridSize === 5 ? 'text-4xl md:text-5xl' : room.gridSize === 6 ? 'text-3xl md:text-4xl' : 'text-2xl md:text-3xl';
-                  return (
-                    <div 
-                      key={index}
-                      className={`flex items-center justify-center font-black uppercase rounded-2xl bg-[#0a0a0a] text-zinc-100 border border-[#333] shadow-[0_0_15px_rgba(0,0,0,0.5)] ${textSizeClass}`}
-                    >
-                      {letter}
+        {/* Main Gameplay Area */}
+        <div className="flex-1 w-full flex justify-between items-center relative z-10 px-4">
+          
+          {/* Left Column Players */}
+          <div className="flex flex-col gap-6 w-72">
+            {leftPlayers.slice(0, 3).map((p) => (
+              <div key={p.id} className="flex items-center gap-4 animate-in slide-in-from-left duration-500">
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full bg-[#2D164D] border-4 border-white/20 overflow-hidden shadow-xl flex items-center justify-center">
+                    <User size={32} className="text-white/40" />
+                  </div>
+                  {p.isHost && (
+                    <div className="absolute -top-2 -right-2 bg-yellow-400 text-black p-1 rounded-full shadow-lg">
+                      <Crown size={12} />
                     </div>
-                  );
-                })}
+                  )}
+                </div>
+                <div>
+                  <div className="flex flex-col">
+                    <span className="text-lg font-black uppercase tracking-wider drop-shadow-md truncate max-w-[160px]">{p.name}</span>
+                    <span className="text-sm font-bold text-white/80 uppercase tracking-widest flex items-center gap-1.5">
+                      <span className="text-xl text-yellow-400">{p.scoredWords?.length || 0}</span> palavras
+                    </span>
+                  </div>
+                </div>
               </div>
+            ))}
+          </div>
 
-              {/* Animated Timer & Info */}
-              <div className="flex flex-col items-center bg-[#111111] p-10 rounded-3xl border border-[#222] shadow-[0_0_40px_rgba(0,0,0,0.8)]">
-                <AnimatedTimer
-                  timeLeft={timeLeft}
-                  totalDuration={room.duration || 180}
-                  size="tv"
-                  showProgressRing={true}
-                />
+          {/* Centered Board */}
+          <div className="relative group">
+            {/* Glow effect behind board */}
+            <div className="absolute inset-0 bg-white/5 blur-[60px] rounded-full scale-110"></div>
+            
+            <div 
+              className="grid gap-3 md:gap-4 bg-[#2D164D] p-6 rounded-[2.5rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] border-4 border-white/10 aspect-square max-w-[600px] w-full relative z-10"
+              style={{ gridTemplateColumns: `repeat(${room.gridSize}, minmax(0, 1fr))` }}
+            >
+              {(room.board || []).map((letter: string, index: number) => {
+                const textSizeClass = room.gridSize === 4 ? 'text-6xl' : room.gridSize === 5 ? 'text-5xl' : room.gridSize === 6 ? 'text-4xl' : room.gridSize === 7 ? 'text-3xl' : 'text-2xl';
+                return (
+                  <div 
+                    key={index}
+                    className={`flex items-center justify-center font-black uppercase rounded-[1.5rem] bg-white text-[#2D164D] shadow-[0_8px_0_0_rgba(0,0,0,0.2)] ${textSizeClass}`}
+                  >
+                    {letter}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right Column Players */}
+          <div className="flex flex-col gap-6 w-72 items-end">
+            {rightPlayers.slice(0, 3).map((p) => (
+              <div key={p.id} className="flex items-center gap-4 text-right animate-in slide-in-from-right duration-500">
+                <div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-lg font-black uppercase tracking-wider drop-shadow-md truncate max-w-[160px]">{p.name}</span>
+                    <span className="text-sm font-bold text-white/80 uppercase tracking-widest flex items-center gap-1.5">
+                      palavras <span className="text-xl text-yellow-400">{p.scoredWords?.length || 0}</span>
+                    </span>
+                  </div>
+                </div>
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full bg-[#2D164D] border-4 border-white/20 overflow-hidden shadow-xl flex items-center justify-center">
+                    <User size={32} className="text-white/40" />
+                  </div>
+                  {p.isHost && (
+                    <div className="absolute -top-2 -left-2 bg-yellow-400 text-black p-1 rounded-full shadow-lg">
+                      <Crown size={12} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom Banner with QR Code */}
+        <div className="w-full flex justify-end items-end p-4 relative z-20">
+          <div className="flex flex-col items-end gap-3">
+            <div className="bg-black/80 backdrop-blur-md p-4 rounded-[2rem] border border-white/20 flex items-center gap-4 shadow-2xl">
+              <div className="text-right">
+                <p className="text-sm font-black uppercase tracking-widest text-white leading-tight">Leia o QR code<br/>para jogar!</p>
+              </div>
+              <div className="bg-white p-2 rounded-2xl">
+                <QRCode value={joinUrl} size={100} />
               </div>
             </div>
-          )}
+          </div>
+        </div>
 
-          {isGameOver && (
-            <div className="w-full flex flex-col items-center animate-in slide-in-from-bottom-8 fade-in duration-700">
-              <div className="flex items-center justify-between w-full max-w-5xl mb-6">
-                <div>
-                  <h2 className="text-4xl md:text-5xl font-black text-[#00FF00] drop-shadow-[0_0_30px_rgba(0,255,0,0.3)] uppercase tracking-widest">Tempo Esgotado!</h2>
-                  <p className="text-zinc-400 font-bold uppercase tracking-widest text-xs mt-1">Veja o pódio ou assista ao replay do tabuleiro abaixo</p>
-                </div>
-                <div className="flex items-center gap-2 bg-[#141414] p-1.5 rounded-2xl border border-[#222]">
-                  <button 
-                    onClick={() => setTvGameOverTab('replay')} 
-                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition ${
-                      tvGameOverTab === 'replay' ? 'bg-[#00FF00] text-black shadow-[0_0_15px_rgba(0,255,0,0.3)]' : 'text-zinc-400 hover:text-zinc-100'
-                    }`}
-                  >
-                    <Eye size={16} /> Replay do Tabuleiro
-                  </button>
-                  <button 
-                    onClick={() => setTvGameOverTab('podium')} 
-                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition ${
-                      tvGameOverTab === 'podium' ? 'bg-[#00FF00] text-black shadow-[0_0_15px_rgba(0,255,0,0.3)]' : 'text-zinc-400 hover:text-zinc-100'
-                    }`}
-                  >
-                    <Trophy size={16} /> Pódio
-                  </button>
-                </div>
-              </div>
-
-              {tvGameOverTab === 'replay' ? (
-                <div className="w-full">
-                  <BoardReplay 
-                    board={room.board || []} 
-                    gridSize={room.gridSize || 4} 
-                    players={players} 
-                  />
-                </div>
-              ) : (
-                <div className="flex gap-8 justify-center items-end h-[360px] w-full">
-                  {computedPlayers.slice(0, 5).map((p, i) => (
-                    <div key={p.id} className="flex flex-col items-center animate-in slide-in-from-bottom fade-in duration-500" style={{ animationDelay: `${i * 150}ms`, animationFillMode: 'both' }}>
-                      <div className="bg-[#111] px-6 py-3 rounded-2xl mb-6 border border-[#222] shadow-xl">
-                        <div className="text-3xl font-black text-zinc-100 uppercase tracking-wider truncate max-w-[200px]">{p.name}</div>
-                        <div className="text-[#00FF00] font-bold text-lg mt-1 tracking-widest text-sm uppercase">{p.scoredWords.length} palavras</div>
-                      </div>
-                      <div className={`w-48 rounded-t-3xl flex flex-col items-center justify-start pt-8 border-x border-t shadow-[0_0_40px_rgba(0,0,0,0.8)] relative
-                        ${i === 0 ? 'bg-[#1a1a1a] h-80 border-[#00FF00]/50 text-[#00FF00] z-10' 
-                        : i === 1 ? 'bg-[#141414] h-64 border-zinc-700 text-zinc-300' 
-                        : 'bg-[#141414] h-48 border-orange-900/50 text-orange-500'}`}>
-                        {i === 0 && <Crown size={64} className="absolute -top-24 text-[#00FF00] drop-shadow-[0_0_20px_rgba(0,255,0,0.4)]" />}
-                        <span className="text-7xl font-black drop-shadow-md">{p.finalScore}</span>
-                        <span className="text-2xl font-bold opacity-80 mt-2 tracking-widest">PTS</span>
-                      </div>
+        {/* Game Over Modal / Results over the board if needed */}
+        {isGameOver && (
+          <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-8 animate-in fade-in duration-500">
+             <div className="bg-[#141414] border border-white/10 p-10 rounded-[3rem] shadow-2xl max-w-4xl w-full flex flex-col items-center">
+                <Trophy size={80} className="text-yellow-400 mb-6 drop-shadow-[0_0_20px_rgba(250,204,21,0.4)]" />
+                <h2 className="text-5xl font-black uppercase tracking-widest text-white mb-2">Fim da Partida!</h2>
+                <p className="text-zinc-500 font-bold uppercase tracking-[0.3em] mb-12">Confira o vencedor na tela do celular</p>
+                
+                <div className="grid grid-cols-3 gap-6 w-full">
+                  {computedPlayers.slice(0, 3).map((p, i) => (
+                    <div key={p.id} className="bg-[#1a1a1a] p-6 rounded-3xl border border-white/5 flex flex-col items-center">
+                      <div className="text-4xl font-black text-[#00FF00] mb-2">{p.finalScore}</div>
+                      <div className="text-sm font-black uppercase tracking-wider text-white truncate w-full text-center">{p.name}</div>
+                      <div className="text-[10px] font-bold uppercase text-zinc-500 mt-1 tracking-widest">{p.scoredWords?.length || 0} palavras</div>
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
-          )}
-        </div>
 
-        {/* Footer Players */}
-        {room.status === 'playing' && (
-          <div className="w-full h-48 bg-[#111] border-t border-[#222] p-6 flex gap-6 overflow-x-auto items-center relative z-20">
-            {computedPlayers.map((p, index) => (
-              <div key={p.id} className="min-w-[240px] h-full bg-[#1a1a1a] rounded-3xl p-5 text-center border border-[#333] flex flex-col justify-center shadow-lg relative overflow-hidden">
-                <div className="absolute top-2 left-3 text-zinc-800 font-black text-5xl italic">#{index + 1}</div>
-                <div className="font-black text-2xl uppercase tracking-wider truncate text-zinc-100 relative z-10">{p.name}</div>
-                <div className="text-5xl font-black text-[#00FF00] my-2 relative z-10 drop-shadow-[0_0_10px_rgba(0,255,0,0.2)]">{p.finalScore}</div>
-                <div className="text-zinc-500 font-bold uppercase tracking-widest text-sm relative z-10">{p.scoredWords.length} palavras</div>
-              </div>
-            ))}
+                <button 
+                  onClick={onLeave}
+                  className="mt-12 px-10 py-4 bg-white text-black font-black rounded-2xl uppercase tracking-[0.2em] hover:scale-105 transition active:scale-95"
+                >
+                  Fechar Partida
+                </button>
+             </div>
           </div>
         )}
       </div>
@@ -651,22 +674,22 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans p-4 md:p-8 selection:bg-transparent">
-      <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-8 items-start">
+    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans p-2 sm:p-4 md:p-8 selection:bg-transparent">
+      <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-4 md:gap-8 items-start">
         
         {/* Lado Esquerdo - Tabuleiro e Controles */}
         <div className="flex-1 w-full max-w-md mx-auto">
-          <header className="mb-6 flex justify-between items-center bg-[#141414] p-4 rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-[#222]">
-            <div>
-              <button onClick={onLeave} className="flex items-center gap-2 text-zinc-500 hover:text-zinc-300 transition text-sm font-bold uppercase mb-1 tracking-widest">
-                <ArrowLeft size={16} /> Sair
+          <header className="mb-4 md:mb-6 flex justify-between items-center bg-[#141414] p-3 md:p-4 rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-[#222]">
+            <div className="overflow-hidden">
+              <button onClick={onLeave} className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-300 transition text-[10px] font-bold uppercase mb-0.5 tracking-widest">
+                <ArrowLeft size={14} /> Sair
               </button>
-              <h1 className="text-xl font-black tracking-widest text-zinc-100 flex items-center gap-2 uppercase">
-                Sala <span className="font-mono bg-[#1a1a1a] px-2 py-1 rounded text-[#00FF00] border border-[#333] shadow-[0_0_10px_rgba(0,255,0,0.1)]">{roomId}</span>
+              <h1 className="text-sm md:text-xl font-black tracking-widest text-zinc-100 flex items-center gap-2 uppercase truncate">
+                Sala <span className="font-mono bg-[#1a1a1a] px-2 py-0.5 md:py-1 rounded text-[#00FF00] border border-[#333] shadow-[0_0_10px_rgba(0,255,0,0.1)]">{roomId}</span>
               </h1>
             </div>
             
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-1.5 md:gap-2 items-center">
               <button
                 onClick={handleToggleMute}
                 className="p-2 bg-[#1a1a1a] hover:bg-[#222] text-zinc-400 hover:text-zinc-200 rounded-xl border border-[#333] transition"
@@ -675,17 +698,17 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
                 {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
               </button>
 
-              <button onClick={() => window.open(`/?room=${roomId}&tv=true`, '_blank')} className="hidden md:flex items-center gap-2 bg-[#1a1a1a] text-[#00FF00] px-3 py-1.5 rounded-lg font-bold hover:bg-[#222] transition text-sm border border-[#00FF00]/30 shadow-[0_0_10px_rgba(0,255,0,0.1)] uppercase tracking-wider">
-                <MonitorPlay size={16} /> Tela TV
+              <button onClick={() => window.open(`/?room=${roomId}&tv=true`, '_blank')} className="hidden sm:flex items-center gap-2 bg-[#1a1a1a] text-[#00FF00] px-3 py-1.5 rounded-lg font-bold hover:bg-[#222] transition text-sm border border-[#00FF00]/30 shadow-[0_0_10px_rgba(0,255,0,0.1)] uppercase tracking-wider">
+                <MonitorPlay size={16} /> <span className="hidden md:inline">Tela TV</span>
               </button>
               
               {isPlaying && (
-                <div className="flex items-center">
+                <div className="flex items-center scale-90 md:scale-100">
                   <AnimatedTimer
                     timeLeft={timeLeft}
                     totalDuration={room.duration || 180}
                     size="md"
-                    showProgressRing={true}
+                    variant="pill"
                   />
                 </div>
               )}
@@ -694,7 +717,7 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
 
           <div 
             ref={boardRef}
-            className="bg-[#141414] p-4 md:p-5 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-[#222] select-none touch-none mb-6 relative overflow-hidden"
+            className="bg-[#141414] p-3 md:p-5 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-[#222] select-none touch-none mb-4 md:mb-6 relative overflow-hidden"
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
@@ -712,49 +735,70 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
                 </div>
                 
                 {isHost ? (
-                  <div className="w-full flex flex-col gap-2 mb-4 max-w-xs">
-                    <div className="flex gap-2 justify-center">
-                      <select 
-                        value={room.gridSize || 4} 
-                        onChange={(e) => {
-                          const size = Number(e.target.value);
-                          updateRoomSettings(roomId, { gridSize: size, board: generateBoard(size) });
-                        }} 
-                        className="flex-1 bg-[#1a1a1a] border border-[#333] px-3 py-2 rounded-lg font-black text-zinc-100 outline-none hover:bg-[#222] cursor-pointer uppercase tracking-widest text-xs"
-                      >
-                        <option value={4}>Grade 4x4</option>
-                        <option value={5}>Grade 5x5</option>
-                        <option value={6}>Grade 6x6</option>
-                        <option value={7}>Grade 7x7</option>
-                      </select>
-                      <select 
-                        value={room.duration || 180} 
-                        onChange={(e) => updateRoomSettings(roomId, { duration: Number(e.target.value) })} 
-                        className="flex-1 bg-[#1a1a1a] border border-[#333] px-3 py-2 rounded-lg font-black text-zinc-100 outline-none hover:bg-[#222] cursor-pointer uppercase tracking-widest text-xs"
-                      >
-                        <option value={60}>Tempo: 60s</option>
-                        <option value={90}>Tempo: 90s</option>
-                        <option value={120}>Tempo: 120s</option>
-                        <option value={180}>Tempo: 180s</option>
-                        <option value={240}>Tempo: 240s</option>
-                        <option value={300}>Tempo: 300s</option>
-                      </select>
-                    </div>
-                    <div className="flex gap-2 justify-center">
-                      <select 
-                        value={room.minWordLength || 3} 
-                        onChange={(e) => updateRoomSettings(roomId, { minWordLength: Number(e.target.value) })} 
-                        className="w-full bg-[#1a1a1a] border border-[#333] px-3 py-2 rounded-lg font-black text-zinc-100 outline-none hover:bg-[#222] cursor-pointer uppercase tracking-widest text-xs text-center"
-                      >
-                        <option value={3}>Mínimo: 3 Letras</option>
-                        <option value={4}>Mínimo: 4 Letras</option>
-                        <option value={5}>Mínimo: 5 Letras</option>
-                      </select>
+                  <div className="w-full flex flex-col gap-4 mb-6 max-w-sm">
+                    <div className="bg-[#1a1a1a] p-4 rounded-[1.5rem] border border-[#333] space-y-4">
+                      {/* Grid Size */}
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Tamanho da Grade</label>
+                        <div className="grid grid-cols-5 gap-1.5">
+                          {[4, 5, 6, 7, 8].map(size => (
+                            <button 
+                              key={size}
+                              onClick={() => updateRoomSettings(roomId, { gridSize: size, board: generateBoard(size) })}
+                              className={`py-2.5 rounded-xl font-black text-[10px] transition-all border ${room.gridSize === size ? 'bg-[#00FF00] text-black border-[#00FF00] shadow-lg' : 'bg-[#0a0a0a] text-zinc-500 border-[#222]'}`}
+                            >
+                              {size}x{size}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Duration */}
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Tempo da Partida</label>
+                        <div className="flex bg-[#0a0a0a] p-1 rounded-xl border border-[#222] overflow-x-auto custom-scrollbar">
+                          {[60, 90, 120, 180, 240, 300].map(time => (
+                            <button 
+                              key={time}
+                              onClick={() => updateRoomSettings(roomId, { duration: time })}
+                              className={`flex-1 py-2 px-1 rounded-lg font-black text-[9px] transition-all whitespace-nowrap ${room.duration === time ? 'bg-[#00FF00] text-black' : 'text-zinc-600 hover:text-zinc-400'}`}
+                            >
+                              {time}s
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Min Letters */}
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Mínimo de Letras</label>
+                        <div className="flex items-center justify-between bg-[#0a0a0a] p-1.5 rounded-xl border border-[#222] max-w-[160px] mx-auto w-full">
+                          <button 
+                            onClick={() => updateRoomSettings(roomId, { minWordLength: Math.max(3, (room.minWordLength || 3) - 1) })}
+                            className="w-8 h-8 rounded-lg bg-[#1a1a1a] border border-[#333] flex items-center justify-center text-[#00FF00] active:scale-90"
+                          >
+                            <Minus size={16} strokeWidth={3} />
+                          </button>
+                          <span className="text-xl font-black text-white">{room.minWordLength || 3}</span>
+                          <button 
+                            onClick={() => updateRoomSettings(roomId, { minWordLength: Math.min(8, (room.minWordLength || 3) + 1) })}
+                            className="w-8 h-8 rounded-lg bg-[#1a1a1a] border border-[#333] flex items-center justify-center text-[#00FF00] active:scale-90"
+                          >
+                            <Plus size={16} strokeWidth={3} />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-[#1a1a1a] border border-[#333] px-4 py-2 rounded-lg font-bold text-zinc-300 mb-6 flex items-center gap-2 uppercase tracking-widest text-sm">
-                     <Clock size={16} className="text-[#00FF00]" /> {room.duration}s • Grade {room.gridSize}x{room.gridSize}
+                  <div className="bg-[#1a1a1a] border border-[#333] px-6 py-4 rounded-[1.5rem] font-black text-zinc-300 mb-6 flex flex-col items-center gap-3 shadow-2xl">
+                     <div className="flex items-center gap-3 text-lg">
+                        <Clock size={20} className="text-[#00FF00]" /> 
+                        <span>{room.duration}s</span>
+                        <span className="text-zinc-600">•</span>
+                        <span>{room.gridSize}x{room.gridSize}</span>
+                     </div>
+                     <p className="text-[10px] uppercase tracking-widest text-zinc-500">Mínimo de {room.minWordLength} letras por palavra</p>
                   </div>
                 )}
                 
@@ -794,7 +838,7 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
               {(room.board || []).map((letter: string, index: number) => {
                 const isSelected = selectedPath.includes(index);
                 const isLast = selectedPath[selectedPath.length - 1] === index;
-                const textSizeClass = room.gridSize === 4 ? 'text-3xl md:text-4xl' : room.gridSize === 5 ? 'text-2xl md:text-3xl' : room.gridSize === 6 ? 'text-xl md:text-2xl' : 'text-lg md:text-xl';
+                const textSizeClass = room.gridSize === 4 ? 'text-3xl md:text-4xl' : room.gridSize === 5 ? 'text-2xl md:text-3xl' : room.gridSize === 6 ? 'text-xl md:text-2xl' : room.gridSize === 7 ? 'text-lg md:text-xl' : 'text-sm md:text-base';
                 
                 return (
                   <div 
@@ -803,12 +847,12 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
                     onPointerDown={(e) => handlePointerDown(index, e)}
                     onPointerEnter={() => handleCellEnter(index)}
                     className={`
-                      flex items-center justify-center font-black uppercase rounded-xl transition-all duration-150 cursor-pointer touch-none ${textSizeClass}
+                      flex items-center justify-center font-black uppercase rounded-2xl md:rounded-[1.5rem] transition-all duration-150 cursor-pointer touch-none ${textSizeClass}
                       ${isSelected 
                         ? 'bg-[#00FF00] text-black shadow-[0_4px_0_0_#00cc00] translate-y-0.5' 
-                        : 'bg-[#1a1a1a] text-zinc-100 hover:bg-[#222] shadow-[0_6px_0_0_#000] active:translate-y-1 active:shadow-[0_2px_0_0_#000] border border-[#333]'
+                        : 'bg-[#2D164D] text-white hover:bg-[#3d1e66] shadow-[0_6px_0_0_#1a0d2d] active:translate-y-1 active:shadow-[0_2px_0_0_#1a0d2d] border border-[#4a247f]/30'
                       }
-                      ${isLast ? 'ring-4 ring-white/50' : ''}
+                      ${isLast ? 'ring-4 ring-white/30' : ''}
                     `}
                   >
                     {letter}
@@ -855,53 +899,54 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
         </div>
 
         {/* Lado Direito - Placar e Jogadores */}
-        <div className="flex-1 w-full bg-[#141414] rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-[#222] flex flex-col h-[500px] lg:h-[750px] overflow-hidden">
+        <div className="flex-1 w-full bg-[#141414] rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-[#222] flex flex-col h-[400px] sm:h-[500px] lg:h-[750px] overflow-hidden mb-8 lg:mb-0">
           
-          <div className="p-6 border-b border-[#222] bg-[#111]">
-            <h3 className="text-sm font-black text-zinc-100 uppercase tracking-widest flex items-center gap-2">
+          <div className="p-4 md:p-6 border-b border-[#222] bg-[#111] flex justify-between items-center">
+            <h3 className="text-xs md:text-sm font-black text-zinc-100 uppercase tracking-widest flex items-center gap-2">
               <Users size={18} className="text-[#00FF00]" /> Jogadores
             </h3>
+            <span className="text-[10px] font-black text-zinc-500 bg-[#1a1a1a] px-2 py-1 rounded border border-[#222] uppercase tracking-widest">{players.length} online</span>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#0a0a0a]">
+          <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 bg-[#0a0a0a]">
             {computedPlayers.map((p, index) => {
               const isMe = p.id === user?.uid;
               const isWinner = isGameOver && index === 0 && p.finalScore > 0;
               return (
-                <div key={p.id} className={`bg-[#111] rounded-2xl p-4 shadow-lg border ${isMe ? 'border-[#00FF00] shadow-[0_0_15px_rgba(0,255,0,0.1)]' : 'border-[#222]'} transition-all`}>
-                  <div className="flex justify-between items-center mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg ${isWinner ? 'bg-[#00FF00] text-black' : 'bg-[#1a1a1a] text-zinc-500 border border-[#333]'}`}>
-                        {isWinner ? <Crown size={20} /> : index + 1}
+                <div key={p.id} className={`bg-[#111] rounded-2xl p-3 md:p-4 shadow-lg border ${isMe ? 'border-[#00FF00] shadow-[0_0_15px_rgba(0,255,0,0.1)]' : 'border-[#222]'} transition-all`}>
+                  <div className="flex justify-between items-center mb-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-8 h-8 md:w-10 md:h-10 rounded-xl flex items-center justify-center font-black text-sm md:text-lg ${isWinner ? 'bg-[#00FF00] text-black' : 'bg-[#1a1a1a] text-zinc-500 border border-[#333]'}`}>
+                        {isWinner ? <Crown size={18} /> : index + 1}
                       </div>
                       <div>
-                        <h4 className="font-black text-zinc-100 flex items-center gap-2 uppercase tracking-wider">
+                        <h4 className="text-xs md:text-sm font-black text-zinc-100 flex items-center gap-1.5 uppercase tracking-wider truncate max-w-[120px] sm:max-w-none">
                           {p.name} 
-                          {isMe && <span className="text-[10px] bg-[#00FF00]/20 text-[#00FF00] border border-[#00FF00]/30 px-2 py-0.5 rounded-full font-black">VOCÊ</span>}
-                          {room.hostId === p.id && <Crown size={14} className="text-[#00FF00]" />}
+                          {isMe && <span className="text-[8px] bg-[#00FF00]/20 text-[#00FF00] border border-[#00FF00]/30 px-1.5 py-0.5 rounded-full font-black">VOCÊ</span>}
+                          {room.hostId === p.id && <Crown size={12} className="text-[#00FF00]" />}
                         </h4>
-                        <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">{p.scoredWords.length || 0} palavras</p>
+                        <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">{p.scoredWords.length || 0} palavras</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5">
                       {isHost && !isMe && room.status === 'waiting' && (
                         <button 
                           onClick={() => transferHost(roomId, p.id)}
-                          className="text-[10px] font-black bg-[#222] text-zinc-300 border border-[#333] px-2 py-1 rounded hover:bg-[#333] transition uppercase tracking-widest"
+                          className="text-[8px] font-black bg-[#222] text-zinc-300 border border-[#333] px-2 py-1 rounded hover:bg-[#333] transition uppercase tracking-widest"
                         >
-                          Dar Host
+                          Host
                         </button>
                       )}
-                      <div className="text-2xl font-black text-[#00FF00] drop-shadow-[0_0_10px_rgba(0,255,0,0.2)]">
-                        {p.finalScore} <span className="text-xs text-zinc-600 font-bold uppercase tracking-widest">pts</span>
+                      <div className="text-xl md:text-2xl font-black text-[#00FF00] drop-shadow-[0_0_10px_rgba(0,255,0,0.2)]">
+                        {p.finalScore} <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">pts</span>
                       </div>
                     </div>
                   </div>
                   
                   {p.scoredWords && p.scoredWords.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-3 border-t border-[#222]">
+                    <div className="flex flex-wrap gap-1.5 pt-2.5 border-t border-[#222]">
                       {p.scoredWords.map((w: any, i: number) => (
-                        <div key={i} className={`px-2 py-1 rounded text-[10px] font-black border flex items-center gap-1 uppercase tracking-widest ${w.count > 1 ? 'bg-[#1a1a1a] border-[#333] text-zinc-500' : 'bg-[#00FF00]/10 border-[#00FF00]/30 text-[#00FF00]'}`}>
+                        <div key={i} className={`px-1.5 py-0.5 rounded text-[9px] font-black border flex items-center gap-1 uppercase tracking-widest ${w.count > 1 ? 'bg-[#1a1a1a] border-[#333] text-zinc-500' : 'bg-[#00FF00]/10 border-[#00FF00]/30 text-[#00FF00]'}`}>
                           {w.word} <span className={w.count > 1 ? 'text-zinc-600' : 'text-[#00cc00]'}>{w.score}</span>
                         </div>
                       ))}
