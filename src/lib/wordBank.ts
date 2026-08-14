@@ -28,33 +28,71 @@ export async function loadUspDictionary(): Promise<void> {
   if (uspLoadPromise) return uspLoadPromise;
 
   uspLoadPromise = (async () => {
-    try {
-      const response = await fetch('/words.txt');
-      if (!response.ok) {
-        throw new Error(`Falha ao carregar dicionário: ${response.statusText}`);
+    const baseUrl = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+    const candidateUrls = Array.from(new Set([
+      `${baseUrl}/words.txt`,
+      './words.txt',
+      '/words.txt',
+      `${baseUrl}/dictionary.txt`,
+      './dictionary.txt',
+      '/dictionary.txt'
+    ]));
+
+    let loadedMap: Map<string, string> | null = null;
+    let loadedList: string[] = [];
+
+    for (const url of candidateUrls) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) continue;
+
+        const text = await response.text();
+        // Se retornar HTML (e.g. 404 fallback do Vite/SPA), ignora
+        const trimmed = text.trim();
+        if (!trimmed || trimmed.startsWith('<')) continue;
+
+        const lines = trimmed.split(/\r?\n/);
+        const map = new Map<string, string>();
+        const list: string[] = [];
+
+        for (let i = 0; i < lines.length; i++) {
+          const w = lines[i].trim();
+          if (w.length >= 2) {
+            const normalized = normalizeWord(w);
+            if (!map.has(normalized)) {
+              map.set(normalized, w);
+            }
+            list.push(w);
+          }
+        }
+
+        if (map.size > 0) {
+          loadedMap = map;
+          loadedList = list;
+          break;
+        }
+      } catch (e) {
+        // tenta a próxima URL
       }
-      const text = await response.text();
-      const lines = text.split(/\r?\n/);
+    }
+
+    if (loadedMap && loadedMap.size > 0) {
+      uspDictionaryMap = loadedMap;
+      uspWordsArray = loadedList;
+      isUspLoaded = true;
+      console.log(`[LOUD BOOGLE] Dicionário IME-USP carregado com sucesso: ${loadedMap.size} palavras.`);
+    } else {
+      // Fallback seguro usando o dicionário base sem gerar exceção
       const map = new Map<string, string>();
       const list: string[] = [];
-
-      for (let i = 0; i < lines.length; i++) {
-        const w = lines[i].trim();
-        if (w.length >= 2) {
-          const normalized = normalizeWord(w);
-          if (!map.has(normalized)) {
-            map.set(normalized, w);
-          }
-          list.push(w);
-        }
+      for (const w of BUILTIN_WORDS_SET) {
+        map.set(w, BUILTIN_WORDS_MAP.get(w) || w);
+        list.push(w);
       }
-
       uspDictionaryMap = map;
       uspWordsArray = list;
       isUspLoaded = true;
-      console.log(`[LOUD BOOGLE] Dicionário IME-USP carregado com sucesso: ${map.size} palavras.`);
-    } catch (err) {
-      console.error("[LOUD BOOGLE] Erro ao carregar dicionário IME-USP:", err);
+      console.log(`[LOUD BOOGLE] Usando dicionário base embutido (${map.size} palavras).`);
     }
   })();
 

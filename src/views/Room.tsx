@@ -184,25 +184,38 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
     startGame(roomId, room.duration || 180);
   };
 
-  const handleCellEnter = (index: number) => {
-    if (!isDragging || room?.status !== 'playing' || isChecking) return;
-    setSelectedPath((prevPath) => {
-      if (prevPath.length >= 2 && prevPath[prevPath.length - 2] === index) {
-        playSelectLetter(Math.max(0, prevPath.length - 2));
-        return prevPath.slice(0, -1);
+
+
+  const gridRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const lastTouchTimeRef = useRef(0);
+
+  const getTileIndexFromCoords = (clientX: number, clientY: number): number | null => {
+    if (gridRef.current) {
+      const rect = gridRef.current.getBoundingClientRect();
+      const margin = 20; // 20px padding margin around board edges
+      if (clientX >= rect.left - margin && clientX <= rect.right + margin &&
+          clientY >= rect.top - margin && clientY <= rect.bottom + margin) {
+        const size = roomGridSize || 4;
+        const clampedX = Math.max(rect.left, Math.min(rect.right - 1, clientX));
+        const clampedY = Math.max(rect.top, Math.min(rect.bottom - 1, clientY));
+        const col = Math.floor(((clampedX - rect.left) / rect.width) * size);
+        const row = Math.floor(((clampedY - rect.top) / rect.height) * size);
+        if (col >= 0 && col < size && row >= 0 && row < size) {
+          const idx = row * size + col;
+          if (idx >= 0 && idx < size * size) return idx;
+        }
       }
-      if (prevPath.includes(index)) return prevPath;
-      if (prevPath.length === 0) {
-        playSelectLetter(0);
-        return [index];
+    }
+    const el = document.elementFromPoint(clientX, clientY);
+    if (el) {
+      const tile = el.closest('[data-index]');
+      if (tile) {
+        const indexStr = tile.getAttribute('data-index');
+        if (indexStr !== null) return parseInt(indexStr, 10);
       }
-      const lastIndex = prevPath[prevPath.length - 1];
-      if (isAdjacent(lastIndex, index, room.gridSize)) {
-        playSelectLetter(prevPath.length);
-        return [...prevPath, index];
-      }
-      return prevPath;
-    });
+    }
+    return null;
   };
 
   const submitWordFromPath = async (pathToSubmit: number[]) => {
@@ -237,30 +250,28 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
     setSelectedPath([]);
   };
 
-  const handlePointerDown = (index: number, e: React.PointerEvent | React.TouchEvent) => {
+  const startDrag = (index: number, e?: React.SyntheticEvent) => {
     if (room?.status !== 'playing' || isChecking) return;
-    
-    if ('pointerId' in e && e.target) {
-      try {
-        const target = e.target as HTMLElement;
-        if (typeof target.releasePointerCapture === 'function') {
-          target.releasePointerCapture(e.pointerId);
-        }
-      } catch {
-        // ignore capture errors on mobile
-      }
+
+    const now = Date.now();
+    if (e?.type === 'touchstart') {
+      lastTouchTimeRef.current = now;
+      if (e.cancelable) e.preventDefault();
+    } else if (e?.type === 'pointerdown' || e?.type === 'mousedown') {
+      if (now - lastTouchTimeRef.current < 400) return;
     }
 
+    isDraggingRef.current = true;
     setIsDragging(true);
 
     setSelectedPath((prevPath) => {
-      // If clicking the last letter again when word is valid, submit word
+      // If tapping last letter again when word length >= minWordLength, submit word
       if (prevPath.length > 0 && prevPath[prevPath.length - 1] === index && prevPath.length >= (room?.minWordLength || 3)) {
         setTimeout(() => submitWordFromPath(prevPath), 0);
         return prevPath;
       }
 
-      // If clicking the second-to-last letter, backspace 1 letter
+      // If tapping second-to-last letter, backspace 1 letter
       if (prevPath.length >= 2 && prevPath[prevPath.length - 2] === index) {
         playSelectLetter(Math.max(0, prevPath.length - 2));
         return prevPath.slice(0, -1);
@@ -274,7 +285,7 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
       }
 
       const lastIndex = prevPath[prevPath.length - 1];
-      if (isAdjacent(lastIndex, index, room.gridSize)) {
+      if (isAdjacent(lastIndex, index, roomGridSize)) {
         playSelectLetter(prevPath.length);
         return [...prevPath, index];
       }
@@ -285,37 +296,116 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
     });
   };
 
-  const handleCellEnterFromCoords = (clientX: number, clientY: number) => {
-    if (!isDragging || room?.status !== 'playing' || isChecking) return;
-    const el = document.elementFromPoint(clientX, clientY);
-    if (!el) return;
-    const tile = el.closest('[data-index]');
-    if (tile) {
-      const indexStr = tile.getAttribute('data-index');
-      if (indexStr !== null) {
-        handleCellEnter(parseInt(indexStr, 10));
+  const processDragMove = (clientX: number, clientY: number) => {
+    if (!isDraggingRef.current || room?.status !== 'playing' || isChecking) return;
+    const index = getTileIndexFromCoords(clientX, clientY);
+    if (index === null) return;
+
+    setSelectedPath((prevPath) => {
+      if (prevPath.length === 0) {
+        playSelectLetter(0);
+        return [index];
       }
-    }
+      const lastIndex = prevPath[prevPath.length - 1];
+      if (index === lastIndex) return prevPath;
+
+      // Handle direct backspacing
+      if (prevPath.length >= 2 && prevPath[prevPath.length - 2] === index) {
+        playSelectLetter(Math.max(0, prevPath.length - 2));
+        return prevPath.slice(0, -1);
+      }
+
+      // Step-by-step interpolation between lastIndex and target index
+      const size = roomGridSize || 4;
+      const startRow = Math.floor(lastIndex / size);
+      const startCol = lastIndex % size;
+      const targetRow = Math.floor(index / size);
+      const targetCol = index % size;
+
+      let currRow = startRow;
+      let currCol = startCol;
+      let newPath = [...prevPath];
+      let changed = false;
+
+      while (currRow !== targetRow || currCol !== targetCol) {
+        const dr = Math.sign(targetRow - currRow);
+        const dc = Math.sign(targetCol - currCol);
+        currRow += dr;
+        currCol += dc;
+        const nextIdx = currRow * size + currCol;
+
+        // Check if backspacing along path
+        if (newPath.length >= 2 && newPath[newPath.length - 2] === nextIdx) {
+          newPath = newPath.slice(0, -1);
+          changed = true;
+          continue;
+        }
+
+        // Cannot revisit a tile already in path
+        if (newPath.includes(nextIdx)) {
+          break;
+        }
+
+        newPath.push(nextIdx);
+        changed = true;
+      }
+
+      if (changed) {
+        playSelectLetter(newPath.length - 1);
+        return newPath;
+      }
+
+      return prevPath;
+    });
   };
 
-  const handlePointerMove = (e: React.PointerEvent) => {
-    handleCellEnterFromCoords(e.clientX, e.clientY);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches && e.touches.length > 0) {
-      handleCellEnterFromCoords(e.touches[0].clientX, e.touches[0].clientY);
-    }
-  };
-
-  const handlePointerUp = async () => {
-    if (!isDragging || room?.status !== 'playing') return;
+  const endDrag = (e?: React.SyntheticEvent) => {
+    if (!isDraggingRef.current) return;
+    if (e && e.cancelable) e.preventDefault();
+    isDraggingRef.current = false;
     setIsDragging(false);
 
-    if (selectedPath.length >= (room?.minWordLength || 3)) {
-      await submitWordFromPath(selectedPath);
-    }
+    setSelectedPath((currentPath) => {
+      if (currentPath.length >= (room?.minWordLength || 3)) {
+        setTimeout(() => submitWordFromPath(currentPath), 0);
+      }
+      return currentPath;
+    });
   };
+
+  useEffect(() => {
+    const handleWindowTouchMove = (e: TouchEvent) => {
+      if (isDraggingRef.current && e.touches.length > 0) {
+        if (e.cancelable) e.preventDefault();
+        processDragMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+    const handleWindowTouchEnd = (e: TouchEvent) => {
+      if (isDraggingRef.current) {
+        if (e.cancelable) e.preventDefault();
+        endDrag();
+      }
+    };
+    const handleWindowPointerUp = () => {
+      if (isDraggingRef.current) {
+        endDrag();
+      }
+    };
+
+    window.addEventListener('touchmove', handleWindowTouchMove, { passive: false });
+    window.addEventListener('touchend', handleWindowTouchEnd, { passive: false });
+    window.addEventListener('touchcancel', handleWindowTouchEnd, { passive: false });
+    window.addEventListener('pointerup', handleWindowPointerUp);
+    window.addEventListener('mouseup', handleWindowPointerUp);
+
+    return () => {
+      window.removeEventListener('touchmove', handleWindowTouchMove);
+      window.removeEventListener('touchend', handleWindowTouchEnd);
+      window.removeEventListener('touchcancel', handleWindowTouchEnd);
+      window.removeEventListener('pointerup', handleWindowPointerUp);
+      window.removeEventListener('mouseup', handleWindowPointerUp);
+    };
+  }, [room?.status, isChecking]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -977,6 +1067,7 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
 
             {/* Grid do Board */}
             <div 
+              ref={gridRef}
               className="grid gap-2 md:gap-3 aspect-square"
               style={{ gridTemplateColumns: `repeat(${roomGridSize}, minmax(0, 1fr))` }}
             >
@@ -989,9 +1080,9 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
                   <div 
                     key={index}
                     data-index={index}
-                    onPointerDown={(e) => handlePointerDown(index, e)}
-                    onTouchStart={(e) => handlePointerDown(index, e)}
-                    onPointerEnter={() => handleCellEnter(index)}
+                    onTouchStart={(e) => startDrag(index, e)}
+                    onPointerDown={(e) => startDrag(index, e)}
+                    onMouseDown={(e) => startDrag(index, e)}
                     style={{ touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
                     className={`
                       flex items-center justify-center font-black uppercase rounded-2xl md:rounded-[1.5rem] transition-all duration-150 cursor-pointer touch-none select-none ${textSizeClass}

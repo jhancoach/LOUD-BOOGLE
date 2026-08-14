@@ -152,31 +152,60 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
     }
   };
 
-  const handlePointerDown = (e: React.PointerEvent | React.TouchEvent, index: number, letter: string) => {
-    if (status !== 'playing' || timeLeft === 0) return;
-    
-    if ('pointerId' in e && e.target) {
-      try {
-        const target = e.target as HTMLElement;
-        if (typeof target.releasePointerCapture === 'function') {
-          target.releasePointerCapture(e.pointerId);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const lastTouchTimeRef = useRef(0);
+
+  const getTileIndexFromCoords = (clientX: number, clientY: number): number | null => {
+    if (gridRef.current) {
+      const rect = gridRef.current.getBoundingClientRect();
+      const margin = 20; // 20px padding margin around board edges
+      if (clientX >= rect.left - margin && clientX <= rect.right + margin &&
+          clientY >= rect.top - margin && clientY <= rect.bottom + margin) {
+        const size = gridSize || 4;
+        const clampedX = Math.max(rect.left, Math.min(rect.right - 1, clientX));
+        const clampedY = Math.max(rect.top, Math.min(rect.bottom - 1, clientY));
+        const col = Math.floor(((clampedX - rect.left) / rect.width) * size);
+        const row = Math.floor(((clampedY - rect.top) / rect.height) * size);
+        if (col >= 0 && col < size && row >= 0 && row < size) {
+          const idx = row * size + col;
+          if (idx >= 0 && idx < size * size) return idx;
         }
-      } catch {
-        // ignore capture errors
       }
     }
+    const el = document.elementFromPoint(clientX, clientY);
+    if (el) {
+      const tile = el.closest('[data-index]');
+      if (tile) {
+        const indexStr = tile.getAttribute('data-index');
+        if (indexStr !== null) return parseInt(indexStr, 10);
+      }
+    }
+    return null;
+  };
 
-    playSelectLetter(0);
+  const startDrag = (index: number, letter: string, e?: React.SyntheticEvent) => {
+    if (status !== 'playing' || timeLeft === 0) return;
+
+    const now = Date.now();
+    if (e?.type === 'touchstart') {
+      lastTouchTimeRef.current = now;
+      if (e.cancelable) e.preventDefault();
+    } else if (e?.type === 'pointerdown' || e?.type === 'mousedown') {
+      if (now - lastTouchTimeRef.current < 400) return;
+    }
+
+    isDraggingRef.current = true;
     setMessage(null);
 
     setCurrentWord(prev => {
-      // If clicking last letter again and word is valid, submit
+      // If clicking last letter again when word >= minWordLength, submit word
       if (prev.length > 0 && prev[prev.length - 1].index === index && prev.length >= minWordLength) {
         setTimeout(() => submitOfflineWord(prev), 0);
         return prev;
       }
 
-      // Backspace if clicking second-to-last
+      // If clicking second-to-last letter, backspace 1 letter
       if (prev.length >= 2 && prev[prev.length - 2].index === index) {
         playSelectLetter(Math.max(0, prev.length - 2));
         return prev.slice(0, -1);
@@ -185,6 +214,7 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
       if (prev.some(w => w.index === index)) return prev;
 
       if (prev.length === 0) {
+        playSelectLetter(0);
         return [{ index, letter }];
       }
 
@@ -195,63 +225,125 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
       }
 
       // Tapping a non-adjacent tile starts a new selection
+      playSelectLetter(0);
       return [{ index, letter }];
     });
   };
 
-  const handleCellEnterFromCoords = (clientX: number, clientY: number) => {
-    if (status !== 'playing' || timeLeft === 0) return;
-    const el = document.elementFromPoint(clientX, clientY);
-    if (!el) return;
-    const tile = el.closest('[data-index]');
-    if (tile) {
-      const indexStr = tile.getAttribute('data-index');
-      const letterStr = tile.getAttribute('data-letter');
-      if (indexStr !== null && letterStr !== null) {
-        handlePointerEnter(parseInt(indexStr, 10), letterStr);
-      }
-    }
-  };
+  const processDragMove = (clientX: number, clientY: number) => {
+    if (!isDraggingRef.current || status !== 'playing' || timeLeft === 0) return;
+    const index = getTileIndexFromCoords(clientX, clientY);
+    if (index === null) return;
 
-  const handlePointerMove = (e: React.PointerEvent) => {
-    handleCellEnterFromCoords(e.clientX, e.clientY);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches && e.touches.length > 0) {
-      handleCellEnterFromCoords(e.touches[0].clientX, e.touches[0].clientY);
-    }
-  };
-
-  const handlePointerEnter = (index: number, letter: string) => {
-    if (status !== 'playing' || timeLeft === 0) return;
     setCurrentWord(prev => {
-      if (prev.length === 0) return prev;
+      if (prev.length === 0) {
+        const letter = board[index];
+        if (!letter) return prev;
+        playSelectLetter(0);
+        return [{ index, letter }];
+      }
       const lastIndex = prev[prev.length - 1].index;
-      
-      if (prev.some(w => w.index === index)) {
-        if (prev.length > 1 && prev[prev.length - 2].index === index) {
-          playSelectLetter(Math.max(0, prev.length - 2));
-          return prev.slice(0, -1);
-        }
-        return prev;
+      if (index === lastIndex) return prev;
+
+      // Handle direct backspacing
+      if (prev.length >= 2 && prev[prev.length - 2].index === index) {
+        playSelectLetter(Math.max(0, prev.length - 2));
+        return prev.slice(0, -1);
       }
 
-      if (isAdjacent(lastIndex, index, gridSize)) {
-        playSelectLetter(prev.length);
-        return [...prev, { index, letter }];
+      // Step-by-step interpolation between lastIndex and target index
+      const size = gridSize || 4;
+      const startRow = Math.floor(lastIndex / size);
+      const startCol = lastIndex % size;
+      const targetRow = Math.floor(index / size);
+      const targetCol = index % size;
+
+      let currRow = startRow;
+      let currCol = startCol;
+      let newWord = [...prev];
+      let changed = false;
+
+      while (currRow !== targetRow || currCol !== targetCol) {
+        const dr = Math.sign(targetRow - currRow);
+        const dc = Math.sign(targetCol - currCol);
+        currRow += dr;
+        currCol += dc;
+        const nextIdx = currRow * size + currCol;
+
+        // Check if backspacing along path
+        if (newWord.length >= 2 && newWord[newWord.length - 2].index === nextIdx) {
+          newWord = newWord.slice(0, -1);
+          changed = true;
+          continue;
+        }
+
+        // Cannot revisit a tile already in path
+        if (newWord.some(w => w.index === nextIdx)) {
+          break;
+        }
+
+        const l = board[nextIdx];
+        if (!l) break;
+
+        newWord.push({ index: nextIdx, letter: l });
+        changed = true;
+      }
+
+      if (changed) {
+        playSelectLetter(newWord.length - 1);
+        return newWord;
       }
 
       return prev;
     });
   };
 
-  const handlePointerUp = async () => {
-    if (status !== 'playing' || timeLeft === 0 || currentWord.length === 0) return;
-    if (currentWord.length >= minWordLength) {
-      await submitOfflineWord(currentWord);
-    }
+  const endDrag = (e?: React.SyntheticEvent) => {
+    if (!isDraggingRef.current) return;
+    if (e && e.cancelable) e.preventDefault();
+    isDraggingRef.current = false;
+
+    setCurrentWord(currentList => {
+      if (currentList.length >= minWordLength) {
+        setTimeout(() => submitOfflineWord(currentList), 0);
+      }
+      return currentList;
+    });
   };
+
+  useEffect(() => {
+    const handleWindowTouchMove = (e: TouchEvent) => {
+      if (isDraggingRef.current && e.touches.length > 0) {
+        if (e.cancelable) e.preventDefault();
+        processDragMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+    const handleWindowTouchEnd = (e: TouchEvent) => {
+      if (isDraggingRef.current) {
+        if (e.cancelable) e.preventDefault();
+        endDrag();
+      }
+    };
+    const handleWindowPointerUp = () => {
+      if (isDraggingRef.current) {
+        endDrag();
+      }
+    };
+
+    window.addEventListener('touchmove', handleWindowTouchMove, { passive: false });
+    window.addEventListener('touchend', handleWindowTouchEnd, { passive: false });
+    window.addEventListener('touchcancel', handleWindowTouchEnd, { passive: false });
+    window.addEventListener('pointerup', handleWindowPointerUp);
+    window.addEventListener('mouseup', handleWindowPointerUp);
+
+    return () => {
+      window.removeEventListener('touchmove', handleWindowTouchMove);
+      window.removeEventListener('touchend', handleWindowTouchEnd);
+      window.removeEventListener('touchcancel', handleWindowTouchEnd);
+      window.removeEventListener('pointerup', handleWindowPointerUp);
+      window.removeEventListener('mouseup', handleWindowPointerUp);
+    };
+  }, [status, timeLeft]);
 
   const totalScore = words.reduce((sum, w) => sum + w.score, 0);
 
@@ -344,15 +436,9 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
               </div>
 
               <div 
-                ref={boardRef}
+                ref={gridRef}
                 className="grid gap-2 md:gap-3 bg-[#0a0a0a] p-4 md:p-6 rounded-3xl touch-none select-none border border-[#222] shadow-inner aspect-square w-full max-w-xl mx-auto"
                 style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`, touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
-                onPointerMove={handlePointerMove}
-                onPointerLeave={handlePointerUp}
-                onPointerUp={handlePointerUp}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handlePointerUp}
-                onTouchCancel={handlePointerUp}
               >
                 {board.map((letter: string, index: number) => {
                   const isSelected = currentWord.some(w => w.index === index);
@@ -364,9 +450,9 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
                       key={index}
                       data-index={index}
                       data-letter={letter}
-                      onPointerDown={(e) => handlePointerDown(e, index, letter)}
-                      onTouchStart={(e) => handlePointerDown(e, index, letter)}
-                      onPointerEnter={() => handlePointerEnter(index, letter)}
+                      onTouchStart={(e) => startDrag(index, letter, e)}
+                      onPointerDown={(e) => startDrag(index, letter, e)}
+                      onMouseDown={(e) => startDrag(index, letter, e)}
                       style={{ touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
                       className={`
                         flex items-center justify-center font-black uppercase rounded-2xl cursor-pointer select-none touch-none transition-all shadow-[0_4px_0_0_rgba(0,0,0,0.8)] ${textSizeClass}
