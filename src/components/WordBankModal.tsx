@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Plus, Trash2, Search, BookOpen, Sparkles, Check, AlertCircle, Database, Layers, ExternalLink } from 'lucide-react';
-import { CustomWordItem, subscribeCustomWords, addCustomWords, removeCustomWord, normalizeWord, searchUspWords, getUspDictionaryStats } from '../lib/wordBank';
+import { CustomWordItem, subscribeCustomWords, addCustomWords, removeCustomWord, searchUspWords, getUspDictionaryStats } from '../lib/wordBank';
+import { normalizeWord } from '../lib/utils';
 
 interface WordBankModalProps {
   isOpen: boolean;

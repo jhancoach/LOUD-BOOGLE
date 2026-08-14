@@ -140,8 +140,8 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
       const myComputed = computedPlayers.find(p => p.id === user.uid);
       if (myComputed && !myComputed.statsSaved && (myComputed.words?.length > 0)) {
         // Calculate rank based on unique scores to handle ties
-        const uniqueScores = Array.from(new Set(computedPlayers.map(p => p.finalScore)))
-          .sort((a, b) => b - a);
+        const scores: number[] = computedPlayers.map(p => p.finalScore as number);
+        const uniqueScores: number[] = Array.from(new Set(scores)).sort((a: number, b: number) => b - a);
         
         const myScore = myComputed.finalScore;
         const scoreIndex = uniqueScores.indexOf(myScore);
@@ -242,12 +242,12 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
     }
 
     setIsChecking(true);
-    const isValid = await validateWord(word, room.minWordLength || 3);
+    const canonical = await validateWord(word, room.minWordLength || 3);
     
-    if (isValid && user) {
+    if (canonical && user) {
       const score = getScore(word);
       playWordSuccess(score);
-      await addWordToPlayer(roomId, user.uid, word);
+      await addWordToPlayer(roomId, user.uid, canonical);
       showMessage(`Palavra adicionada! +${score} pts`, 'success');
     } else {
       playWordError();

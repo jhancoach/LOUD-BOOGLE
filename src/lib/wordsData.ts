@@ -1,3 +1,5 @@
+import { normalizeWord } from './utils';
+
 // Banco de palavras base em Português com termos comuns, verbos, substantivos e termos de games/LOUD
 // Otimizado para busca instantânea O(1) via Set
 
@@ -277,5 +279,10 @@ export const BUILTIN_PORTUGUESE_WORDS: string[] = [
 
 // Helper Set para busca ultra rápida O(1)
 export const BUILTIN_WORDS_SET = new Set(
-  BUILTIN_PORTUGUESE_WORDS.map(w => w.toUpperCase().trim())
+  BUILTIN_PORTUGUESE_WORDS.map(w => normalizeWord(w))
+);
+
+// Helper Map para recuperar a versão com acentos/cedilha
+export const BUILTIN_WORDS_MAP = new Map(
+  BUILTIN_PORTUGUESE_WORDS.map(w => [normalizeWord(w), w.toUpperCase()])
 );

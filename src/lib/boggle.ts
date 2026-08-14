@@ -1,13 +1,16 @@
 import { checkMasterWordBank, getDictionaryWords } from './wordBank';
+import { normalizeWord } from './utils';
 
 export const BOGGLE_DICE_PT = [
-  "QBZJXK", "TOUOTO", "OVCGRR", "AAAFSR",
-  "AUMEEG", "HLNNRZ", "EOOPTT", "EILRUW",
-  "ENSSSU", "AEEMOO", "EHISPN", "AFIRSY",
-  "DITEYE", "AJABOO", "AOTTWO", "CIMOTU",
-  "DEILRX", "ELPSTU", "AAEEGN", "ABJOOO",
-  "ABBJOO", "ACHOPS", "EIIITT", "AOOTTW",
-  "AEEMOR", "BJKQXZ", "AEEGIN", "EHLNNR"
+  ["Q", "B", "Z", "J", "X", "K"], ["T", "O", "U", "O", "T", "O"], ["O", "V", "C", "G", "RR", "R"], ["A", "A", "A", "F", "S", "R"],
+  ["A", "U", "M", "E", "E", "G"], ["H", "L", "N", "N", "R", "Z"], ["E", "O", "O", "P", "T", "T"], ["E", "I", "L", "R", "U", "QU"],
+  ["E", "N", "S", "S", "S", "U"], ["A", "E", "E", "M", "O", "O"], ["E", "H", "I", "S", "P", "N"], ["A", "F", "I", "R", "S", "Y"],
+  ["D", "I", "T", "E", "Y", "E"], ["A", "J", "A", "B", "O", "O"], ["A", "O", "T", "T", "O", "CH"], ["C", "I", "M", "O", "T", "U"],
+  ["D", "E", "I", "L", "R", "X"], ["E", "L", "P", "S", "T", "U"], ["A", "A", "E", "E", "G", "N"], ["A", "B", "J", "O", "O", "O"],
+  ["A", "B", "B", "J", "O", "O"], ["A", "CH", "O", "P", "S", "RR"], ["E", "I", "I", "I", "T", "T"], ["A", "O", "O", "T", "T", "NH"],
+  ["A", "E", "E", "M", "O", "R"], ["B", "J", "K", "Q", "X", "Z"], ["A", "E", "E", "G", "I", "N"], ["E", "H", "L", "N", "N", "R"],
+  ["Ç", "A", "O", "E", "I", "U"], ["Ç", "R", "S", "T", "N", "L"], ["A", "Ã", "E", "I", "O", "U"], ["Õ", "A", "E", "E", "I", "O"],
+  ["LH", "NH", "RR", "CH", "QU", "SS"]
 ];
 
 export function generateBoard(size: number = 4): string[] {
@@ -17,11 +20,13 @@ export function generateBoard(size: number = 4): string[] {
     dice.push(BOGGLE_DICE_PT[i % BOGGLE_DICE_PT.length]);
   }
   // Shuffle dice
-  const shuffled = dice.sort(() => Math.random() - 0.5);
+  const shuffled = [...dice].sort(() => Math.random() - 0.5);
   // Pick random face
   return shuffled.map(die => {
-    const letter = die[Math.floor(Math.random() * die.length)];
-    return letter === 'Q' ? 'QU' : letter;
+    const face = die[Math.floor(Math.random() * die.length)];
+    // Special handling: if face is 'Q' and we don't have 'QU' in the dice pool yet, maybe force it?
+    // But now we have 'QU' and 'CH' etc directly in the dice.
+    return face === 'Q' ? 'QU' : face;
   });
 }
 
@@ -45,7 +50,7 @@ export function isAdjacent(index1: number, index2: number, size: number = 4): bo
   return Math.abs(row1 - row2) <= 1 && Math.abs(col1 - col2) <= 1;
 }
 
-export async function validateWord(word: string, minLength: number = 3): Promise<boolean> {
+export async function validateWord(word: string, minLength: number = 3): Promise<string | null> {
   return checkMasterWordBank(word, minLength);
 }
 
@@ -55,10 +60,10 @@ export async function validateWord(word: string, minLength: number = 3): Promise
  */
 export function findWordPath(word: string, board: string[], size: number = 4): number[] | null {
   if (!word || !board || board.length === 0) return null;
-  const target = word.toUpperCase();
+  const target = normalizeWord(word);
 
   function dfs(currentIndex: number, letterPos: number, visited: Set<number>, path: number[]): number[] | null {
-    const cellLetter = (board[currentIndex] || '').toUpperCase();
+    const cellLetter = normalizeWord(board[currentIndex] || '');
     const matchLen = cellLetter.length;
 
     // Check if the current cell matches the target substring

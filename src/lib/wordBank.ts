@@ -1,6 +1,7 @@
 import { collection, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { db } from './firebase';
-import { BUILTIN_WORDS_SET } from './wordsData';
+import { BUILTIN_WORDS_SET, BUILTIN_WORDS_MAP } from './wordsData';
+import { normalizeWord } from './utils';
 
 export interface CustomWordItem {
   id: string;
@@ -15,20 +16,11 @@ let liveCustomWordsSet = new Set<string>();
 let liveCustomWordsList: CustomWordItem[] = [];
 let isInitialized = false;
 
-// USP IME Dictionary Set cache
-let uspDictionarySet = new Set<string>();
+// USP IME Dictionary Map cache (normalized -> original)
+let uspDictionaryMap = new Map<string, string>();
 let isUspLoaded = false;
 let uspLoadPromise: Promise<void> | null = null;
 let uspWordsArray: string[] = [];
-
-// Remove acentos e normaliza
-export function normalizeWord(word: string): string {
-  return word
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-    .trim();
-}
 
 // Carrega o dicionário completo do IME-USP (245.000+ palavras)
 export async function loadUspDictionary(): Promise<void> {
@@ -43,21 +35,24 @@ export async function loadUspDictionary(): Promise<void> {
       }
       const text = await response.text();
       const lines = text.split(/\r?\n/);
-      const set = new Set<string>();
+      const map = new Map<string, string>();
       const list: string[] = [];
 
       for (let i = 0; i < lines.length; i++) {
         const w = lines[i].trim();
         if (w.length >= 2) {
-          set.add(w);
+          const normalized = normalizeWord(w);
+          if (!map.has(normalized)) {
+            map.set(normalized, w);
+          }
           list.push(w);
         }
       }
 
-      uspDictionarySet = set;
+      uspDictionaryMap = map;
       uspWordsArray = list;
       isUspLoaded = true;
-      console.log(`[LOUD BOOGLE] Dicionário IME-USP carregado com sucesso: ${set.size} palavras.`);
+      console.log(`[LOUD BOOGLE] Dicionário IME-USP carregado com sucesso: ${map.size} palavras.`);
     } catch (err) {
       console.error("[LOUD BOOGLE] Erro ao carregar dicionário IME-USP:", err);
     }
@@ -82,7 +77,7 @@ export function getDictionaryWords(): string[] {
 export function getUspDictionaryStats() {
   return {
     isLoaded: isUspLoaded,
-    totalWords: isUspLoaded ? uspDictionarySet.size : 245115,
+    totalWords: isUspLoaded ? uspDictionaryMap.size : 245115,
   };
 }
 
@@ -199,65 +194,61 @@ export async function removeCustomWord(wordId: string): Promise<boolean> {
 }
 
 // Validador mestre: checa Dicionário IME-USP (245k+) + Built-in + Custom Firestore + Dicionário Aberto + Regras de Plural
-export async function checkMasterWordBank(word: string, minLength: number = 3): Promise<boolean> {
+export async function checkMasterWordBank(word: string, minLength: number = 3): Promise<string | null> {
   const clean = normalizeWord(word);
-  if (clean.length < minLength) return false;
+  if (clean.length < minLength) return null;
 
-  // Função auxiliar para checar palavra nos sets existentes
-  const existsInLocalBanks = (w: string) => {
-    return (isUspLoaded && uspDictionarySet.has(w)) || 
-           liveCustomWordsSet.has(w) || 
-           BUILTIN_WORDS_SET.has(w);
-  };
-
-  // 1. Checa diretamente nos bancos locais
-  if (existsInLocalBanks(clean)) return true;
-
-  // 2. Regra de Plural simples para Português (S, ES, IS)
-  // Se a palavra termina em S, tentamos encontrar a versão singular
-  if (clean.endsWith('S')) {
-    const candidates = [];
-    // Caso geral: AMIGOS -> AMIGO
-    candidates.push(clean.substring(0, clean.length - 1));
-    // Caso ES: FLORES -> FLOR, MESES -> MES
-    if (clean.endsWith('ES')) {
-      candidates.push(clean.substring(0, clean.length - 2));
-    }
-    // Caso IS: JOGUAIS -> JOGAL (azul -> azuis)
-    if (clean.endsWith('IS')) {
-       candidates.push(clean.substring(0, clean.length - 2) + 'L');
-    }
-
-    for (const cand of candidates) {
-      if (cand.length >= 2 && existsInLocalBanks(cand)) return true;
-    }
+  // 1. Checa no banco embutido (mais rápido)
+  if (BUILTIN_WORDS_SET.has(clean)) {
+    return BUILTIN_WORDS_MAP.get(clean) || clean;
   }
 
-  // Se o dicionário ainda estiver carregando a promise pela primeira vez, aguarda
+  // 2. Checa no banco customizado (Firestore)
+  if (liveCustomWordsSet.has(clean)) {
+    return clean;
+  }
+
+  // 3. Checa no dicionário IME-USP
+  if (isUspLoaded && uspDictionaryMap.has(clean)) {
+    return uspDictionaryMap.get(clean) || clean;
+  }
+
+  // Se o dicionário ainda estiver carregando, aguarda
   if (!isUspLoaded && uspLoadPromise) {
     try {
       await uspLoadPromise;
-      if (uspDictionarySet.has(clean)) {
-        return true;
+      if (uspDictionaryMap.has(clean)) {
+        return uspDictionaryMap.get(clean) || clean;
       }
-    } catch (e) {
-      // continua para o fallback
+    } catch (e) {}
+  }
+
+  // 4. Regra de Plural simples
+  if (clean.endsWith('S')) {
+    const candidates = [clean.substring(0, clean.length - 1)];
+    if (clean.endsWith('ES')) candidates.push(clean.substring(0, clean.length - 2));
+    if (clean.endsWith('IS')) candidates.push(clean.substring(0, clean.length - 2) + 'L');
+
+    for (const cand of candidates) {
+      if (cand.length >= 2) {
+        if (isUspLoaded && uspDictionaryMap.has(cand)) return clean; // If singular exists, plural is likely valid
+        if (BUILTIN_WORDS_SET.has(cand)) return clean;
+        if (liveCustomWordsSet.has(cand)) return clean;
+      }
     }
   }
 
-  // 4. Fallback para API do Dicionário Aberto em português
+  // 5. Fallback para API externa
   try {
     const res = await fetch(`https://api.dicionario-aberto.net/word/${clean.toLowerCase()}`);
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
-        return true;
+        return data[0].word.toUpperCase();
       }
     }
-  } catch (e) {
-    console.warn("Dicionário externo indisponível, checando honestidade.", e);
-  }
+  } catch (e) {}
 
-  return false;
+  return null;
 }
 

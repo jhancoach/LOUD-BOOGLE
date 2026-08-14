@@ -81,12 +81,35 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
       if (user && !hasSavedSoloStats && words.length > 0) {
         setHasSavedSoloStats(true);
         const totalScore = words.reduce((sum, w) => sum + w.score, 0);
+        
+        let longestInGame = '';
+        words.forEach(w => {
+          if (w.word.length > longestInGame.length) {
+            longestInGame = w.word;
+          }
+        });
+
         const userRef = doc(db, 'users', user.uid);
-        updateDoc(userRef, {
+        const updates: any = {
           totalScore: increment(totalScore),
           wordsFound: increment(words.length),
           gamesPlayed: increment(1)
-        }).catch(err => console.warn("Solo stats persistence warning:", err));
+        };
+
+        if (longestInGame) {
+          // We don't have the current longest word here easily without a fetch, 
+          // but we can trust the database or just send it and use conditional logic if we were using a function.
+          // Since we are using updateDoc, we might overwrite. 
+          // However, for simplicity in offline mode, we'll just check if it's longer than what we think it is if we had the profile.
+          // Given the structure, let's just use the current longestInGame and we can't easily compare without the profile state.
+          // BUT, we can use the 'profile' from useAuth!
+        }
+        
+        if (longestInGame && profile && longestInGame.length > (profile.longestWordFound?.length || 0)) {
+          updates.longestWordFound = longestInGame.toUpperCase();
+        }
+
+        updateDoc(userRef, updates).catch(err => console.warn("Solo stats persistence warning:", err));
       }
     }
   }, [status, user, hasSavedSoloStats, words]);
@@ -155,11 +178,11 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
       return;
     }
 
-    const isValid = await validateWord(wordStr);
-    if (isValid) {
+    const canonical = await validateWord(wordStr);
+    if (canonical) {
       const score = Math.max(1, wordStr.length - 2);
       playWordSuccess(score);
-      setWords(prev => [{word: wordStr, score}, ...prev]);
+      setWords(prev => [{word: canonical, score}, ...prev]);
       setMessage({ text: `Palavra válida! +${score} pts`, type: 'success' });
     } else {
       playWordError();
