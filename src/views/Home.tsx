@@ -155,6 +155,10 @@ export default function Home({ onJoinRoom, onStartOffline }: { onJoinRoom: (id: 
                 ENTRAR COM GOOGLE
               </button>
               
+              <p className="text-[11px] text-zinc-500 text-center uppercase tracking-wider -mt-2">
+                Dica: Caso o pop-up do Google seja bloqueado pelo navegador, use <strong>Jogar como Convidado</strong> abaixo ou abra em uma nova aba.
+              </p>
+              
               <button onClick={loginAnonymously} className="w-full bg-[#00FF00] text-black px-6 py-4 rounded-xl font-black hover:bg-[#00e600] transition shadow-[0_0_20px_rgba(0,255,0,0.2)] tracking-wide uppercase flex items-center justify-center gap-2">
                 <Play size={20} fill="currentColor" /> JOGAR COMO CONVIDADO (ONLINE)
               </button>
