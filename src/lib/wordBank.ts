@@ -198,24 +198,39 @@ export async function removeCustomWord(wordId: string): Promise<boolean> {
   }
 }
 
-// Validador mestre: checa Dicionário IME-USP (245k+) + Built-in + Custom Firestore + Dicionário Aberto
+// Validador mestre: checa Dicionário IME-USP (245k+) + Built-in + Custom Firestore + Dicionário Aberto + Regras de Plural
 export async function checkMasterWordBank(word: string, minLength: number = 3): Promise<boolean> {
   const clean = normalizeWord(word);
   if (clean.length < minLength) return false;
 
-  // 1. Checa no Dicionário IME-USP oficial (245.000+ palavras)
-  if (isUspLoaded && uspDictionarySet.has(clean)) {
-    return true;
-  }
+  // Função auxiliar para checar palavra nos sets existentes
+  const existsInLocalBanks = (w: string) => {
+    return (isUspLoaded && uspDictionarySet.has(w)) || 
+           liveCustomWordsSet.has(w) || 
+           BUILTIN_WORDS_SET.has(w);
+  };
 
-  // 2. Checa no banco de palavras customizado da comunidade/jogadores (Firestore)
-  if (liveCustomWordsSet.has(clean)) {
-    return true;
-  }
+  // 1. Checa diretamente nos bancos locais
+  if (existsInLocalBanks(clean)) return true;
 
-  // 3. Checa no banco de palavras base embutido
-  if (BUILTIN_WORDS_SET.has(clean)) {
-    return true;
+  // 2. Regra de Plural simples para Português (S, ES, IS)
+  // Se a palavra termina em S, tentamos encontrar a versão singular
+  if (clean.endsWith('S')) {
+    const candidates = [];
+    // Caso geral: AMIGOS -> AMIGO
+    candidates.push(clean.substring(0, clean.length - 1));
+    // Caso ES: FLORES -> FLOR, MESES -> MES
+    if (clean.endsWith('ES')) {
+      candidates.push(clean.substring(0, clean.length - 2));
+    }
+    // Caso IS: JOGUAIS -> JOGAL (azul -> azuis)
+    if (clean.endsWith('IS')) {
+       candidates.push(clean.substring(0, clean.length - 2) + 'L');
+    }
+
+    for (const cand of candidates) {
+      if (cand.length >= 2 && existsInLocalBanks(cand)) return true;
+    }
   }
 
   // Se o dicionário ainda estiver carregando a promise pela primeira vez, aguarda

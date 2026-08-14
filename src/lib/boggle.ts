@@ -4,7 +4,10 @@ export const BOGGLE_DICE_PT = [
   "QBZJXK", "TOUOTO", "OVCGRR", "AAAFSR",
   "AUMEEG", "HLNNRZ", "EOOPTT", "EILRUW",
   "ENSSSU", "AEEMOO", "EHISPN", "AFIRSY",
-  "DITEYE", "AJABOO", "AOTTWO", "CIMOTU"
+  "DITEYE", "AJABOO", "AOTTWO", "CIMOTU",
+  "DEILRX", "ELPSTU", "AAEEGN", "ABJOOO",
+  "ABBJOO", "ACHOPS", "EIIITT", "AOOTTW",
+  "AEEMOR", "BJKQXZ", "AEEGIN", "EHLNNR"
 ];
 
 export function generateBoard(size: number = 4): string[] {

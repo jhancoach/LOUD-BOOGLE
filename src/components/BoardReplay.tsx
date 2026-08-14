@@ -193,9 +193,9 @@ export default function BoardReplay({ board, gridSize = 4, players, currentUserI
   }
 
   return (
-    <div className="bg-[#111111] border border-[#222] rounded-3xl p-4 md:p-6 shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col lg:flex-row gap-6 w-full max-w-5xl mx-auto">
+    <div className="bg-[#111111] border border-[#222] rounded-3xl p-3 sm:p-4 md:p-6 shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col lg:flex-row gap-6 w-full max-w-5xl mx-auto overflow-hidden">
       {/* Left Column: Interactive Replay Board */}
-      <div className="flex-1 flex flex-col items-center">
+      <div className="flex-1 flex flex-col items-center w-full">
         {/* Header with Title & Speed Switcher */}
         <div className="w-full flex items-center justify-between mb-4 flex-wrap gap-2">
           <div className="flex items-center gap-2">
@@ -238,7 +238,7 @@ export default function BoardReplay({ board, gridSize = 4, players, currentUserI
 
         {/* The Visual Boggle Board */}
         <div 
-          className="grid gap-2 p-3 bg-[#0a0a0a] rounded-2xl border-2 border-[#222] shadow-[0_0_30px_rgba(0,0,0,0.9)] w-full max-w-[340px] aspect-square"
+          className="grid gap-1.5 sm:gap-2 p-2 sm:p-3 bg-[#0a0a0a] rounded-2xl border-2 border-[#222] shadow-[0_0_30px_rgba(0,0,0,0.9)] w-full max-w-[320px] sm:max-w-[340px] aspect-square"
           style={{
             gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`,
             gridTemplateRows: `repeat(${gridSize}, minmax(0, 1fr))`

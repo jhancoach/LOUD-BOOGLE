@@ -132,11 +132,28 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
   // Win condition and stats saving
   useEffect(() => {
     if (isTV) return;
-    if (room?.status === 'playing' && timeLeft === 0 && user && players.length > 0) {
+    // Se o tempo acabou OU se o jogo acabou (status waiting mas com palavras), tenta salvar
+    const isActuallyOver = (room?.status === 'playing' && timeLeft === 0) || 
+                           (room?.status === 'waiting' && players.some(p => p.id === user?.uid && p.words?.length > 0));
+    
+    if (isActuallyOver && user && players.length > 0) {
       const myComputed = computedPlayers.find(p => p.id === user.uid);
-      if (myComputed && !myComputed.statsSaved) {
-        const isWinner = computedPlayers[0]?.id === user.uid && myComputed.finalScore > 0;
-        saveFinalStats(roomId, user.uid, myComputed.finalScore, myComputed.scoredWords.length, isWinner);
+      if (myComputed && !myComputed.statsSaved && (myComputed.words?.length > 0)) {
+        // Calculate rank based on unique scores to handle ties
+        const uniqueScores = Array.from(new Set(computedPlayers.map(p => p.finalScore)))
+          .sort((a, b) => b - a);
+        
+        const myScore = myComputed.finalScore;
+        const scoreIndex = uniqueScores.indexOf(myScore);
+        
+        // Rank is 1-based index of unique scores
+        // If my score is 0, no trophies
+        let rank = 0;
+        if (myScore > 0 && scoreIndex !== -1 && scoreIndex < 3) {
+          rank = scoreIndex + 1;
+        }
+
+        saveFinalStats(roomId, user.uid, myComputed.finalScore, myComputed.scoredWords.length, rank);
       }
     }
   }, [timeLeft, room?.status, user, computedPlayers, roomId, players.length]);
@@ -191,7 +208,7 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging || room?.status !== 'playing') return;
+    if (!isDragging || room?.status !== 'playing' || isChecking) return;
     const el = document.elementFromPoint(e.clientX, e.clientY);
     if (el) {
       const indexStr = el.getAttribute('data-index');
@@ -784,6 +801,7 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
                     key={index}
                     data-index={index}
                     onPointerDown={(e) => handlePointerDown(index, e)}
+                    onPointerEnter={() => handleCellEnter(index)}
                     className={`
                       flex items-center justify-center font-black uppercase rounded-xl transition-all duration-150 cursor-pointer touch-none ${textSizeClass}
                       ${isSelected 
@@ -837,7 +855,7 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
         </div>
 
         {/* Lado Direito - Placar e Jogadores */}
-        <div className="flex-1 w-full bg-[#141414] rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-[#222] flex flex-col h-[750px] overflow-hidden">
+        <div className="flex-1 w-full bg-[#141414] rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-[#222] flex flex-col h-[500px] lg:h-[750px] overflow-hidden">
           
           <div className="p-6 border-b border-[#222] bg-[#111]">
             <h3 className="text-sm font-black text-zinc-100 uppercase tracking-widest flex items-center gap-2">

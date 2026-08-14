@@ -103,7 +103,7 @@ export const suggestWord = async (word: string, userId: string) => {
     createdAt: new Date()
   });
 };
-export const saveFinalStats = async (roomId: string, userId: string, addedScore: number, addedWords: number, isWinner: boolean) => {
+export const saveFinalStats = async (roomId: string, userId: string, addedScore: number, addedWords: number, rank: number) => {
   try {
     const playerRef = doc(db, 'rooms', roomId, 'players', userId);
     const playerSnap = await getDoc(playerRef);
@@ -114,7 +114,16 @@ export const saveFinalStats = async (roomId: string, userId: string, addedScore:
 
     const userRef = doc(db, 'users', userId);
     const userSnap = await getDoc(userRef);
-    const currentHigh = userSnap.exists() ? (userSnap.data().highestSingleGameScore || 0) : 0;
+    
+    let currentHigh = 0;
+    let currentName = 'Jogador';
+    
+    if (userSnap.exists()) {
+      const data = userSnap.data();
+      currentHigh = data.highestSingleGameScore || 0;
+      currentName = data.name || data.displayName || 'Jogador';
+    }
+    
     const newHigh = Math.max(currentHigh, addedScore);
 
     const updates: any = {
@@ -122,14 +131,44 @@ export const saveFinalStats = async (roomId: string, userId: string, addedScore:
       wordsFound: increment(addedWords),
       gamesPlayed: increment(1),
       highestSingleGameScore: newHigh,
-      lastPlayedAt: new Date().toISOString()
+      lastPlayedAt: new Date().toISOString(),
+      name: currentName // Garantir que o nome está lá para o leaderboard
     };
-    
-    if (isWinner) {
-      updates.wins = increment(1);
+
+    // Tracking longest word
+    if (playerSnap.exists()) {
+      const pData = playerSnap.data();
+      const pWords = (pData.words || []) as { word: string }[];
+      let longestInGame = '';
+      pWords.forEach(w => {
+        if (w.word.length > longestInGame.length) {
+          longestInGame = w.word;
+        }
+      });
+
+      if (longestInGame) {
+        let globalLongest = '';
+        if (userSnap.exists()) {
+          globalLongest = userSnap.data().longestWordFound || '';
+        }
+
+        if (longestInGame.length > globalLongest.length) {
+          updates.longestWordFound = longestInGame.toUpperCase();
+        }
+      }
     }
     
-    await updateDoc(userRef, updates);
+    if (rank === 1) {
+      updates.wins = increment(1);
+      updates.goldTrophies = increment(1);
+    } else if (rank === 2) {
+      updates.silverTrophies = increment(1);
+    } else if (rank === 3) {
+      updates.bronzeTrophies = increment(1);
+    }
+    
+    // Usar setDoc com merge para garantir que o documento exista
+    await setDoc(userRef, updates, { merge: true });
     await updateDoc(playerRef, { statsSaved: true });
   } catch (e) {
     console.error("Erro ao salvar status final persistente:", e);

@@ -107,6 +107,18 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
     setMessage(null);
   };
 
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (status !== 'playing' || timeLeft === 0 || currentWord.length === 0) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (el) {
+      const indexStr = el.getAttribute('data-index');
+      const letterStr = el.getAttribute('data-letter');
+      if (indexStr !== null && letterStr !== null) {
+        handlePointerEnter(parseInt(indexStr, 10), letterStr);
+      }
+    }
+  };
+
   const handlePointerEnter = (index: number, letter: string) => {
     if (status !== 'playing' || timeLeft === 0 || currentWord.length === 0) return;
     const lastIndex = currentWord[currentWord.length - 1].index;
@@ -166,12 +178,12 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
   }];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans p-4 md:p-8 select-none">
-      <div className="max-w-4xl mx-auto flex flex-col gap-6">
-        <header className="bg-[#141414] p-6 rounded-3xl shadow-[0_0_20px_rgba(0,0,0,0.8)] border border-[#222] flex justify-between items-center">
+    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans p-3 sm:p-4 md:p-8 select-none">
+      <div className="max-w-4xl mx-auto flex flex-col gap-5 sm:gap-6">
+        <header className="bg-[#141414] p-4 sm:p-6 rounded-3xl shadow-[0_0_20px_rgba(0,0,0,0.8)] border border-[#222] flex justify-between items-center">
           <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-[#00FF00] bg-[#00FF00]/10 px-2 py-0.5 rounded border border-[#00FF00]/30">LOUD BOOGLE</span>
-            <h1 className="text-2xl font-black text-zinc-100 uppercase tracking-widest mt-1">Modo Treino</h1>
+            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-[#00FF00] bg-[#00FF00]/10 px-2 py-0.5 rounded border border-[#00FF00]/30">LOUD BOOGLE</span>
+            <h1 className="text-xl sm:text-2xl font-black text-zinc-100 uppercase tracking-widest mt-0.5 sm:mt-1">Modo Treino</h1>
           </div>
           <div className="flex gap-3 items-center">
             <button 
@@ -233,6 +245,7 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
                 ref={boardRef}
                 className="grid gap-2 md:gap-3 bg-[#0a0a0a] p-4 md:p-6 rounded-3xl touch-none border border-[#222] shadow-inner aspect-square w-full max-w-xl mx-auto"
                 style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}
+                onPointerMove={handlePointerMove}
                 onPointerLeave={handlePointerUp}
                 onPointerUp={handlePointerUp}
               >
@@ -244,6 +257,8 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
                   return (
                     <div 
                       key={index}
+                      data-index={index}
+                      data-letter={letter}
                       onPointerDown={(e) => handlePointerDown(e, index, letter)}
                       onPointerEnter={() => handlePointerEnter(index, letter)}
                       className={`
