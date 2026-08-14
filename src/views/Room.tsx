@@ -899,15 +899,8 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
           </header>
 
           <div 
-            ref={boardRef}
             className="bg-[#141414] p-3 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-[#222] select-none touch-none mb-4 relative overflow-hidden"
             style={{ touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerUp}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handlePointerUp}
-            onTouchCancel={handlePointerUp}
           >
             {room.status === 'waiting' && (
               <div className="absolute inset-0 z-20 bg-[#0a0a0a]/98 backdrop-blur-md rounded-2xl flex flex-col p-4 overflow-y-auto custom-scrollbar">
