@@ -47,10 +47,18 @@ export default function Home({ onJoinRoom, onStartOffline }: { onJoinRoom: (id: 
 
   useEffect(() => {
     const qWins = query(collection(db, 'users'), orderBy('wins', 'desc'), limit(5));
-    const unsubWins = onSnapshot(qWins, (snap) => setTopWinners(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+    const unsubWins = onSnapshot(qWins, (snap) => {
+      setTopWinners(snap.docs.map(d => ({id: d.id, ...d.data()})));
+    }, (err) => {
+      console.warn("Leaderboard wins listener warning:", err);
+    });
     
     const qWords = query(collection(db, 'users'), orderBy('wordsFound', 'desc'), limit(5));
-    const unsubWords = onSnapshot(qWords, (snap) => setTopWords(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+    const unsubWords = onSnapshot(qWords, (snap) => {
+      setTopWords(snap.docs.map(d => ({id: d.id, ...d.data()})));
+    }, (err) => {
+      console.warn("Leaderboard words listener warning:", err);
+    });
     
     return () => { unsubWins(); unsubWords(); };
   }, []);
@@ -166,26 +174,44 @@ export default function Home({ onJoinRoom, onStartOffline }: { onJoinRoom: (id: 
             </div>
           ) : (
             <div className="w-full space-y-8 relative z-10">
-              <div className="flex items-center justify-between bg-[#0a0a0a] p-4 rounded-xl border border-[#222]">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-[#00FF00] rounded-full flex items-center justify-center text-black font-black text-xl uppercase shadow-[0_0_15px_rgba(0,255,0,0.3)]">
-                    {profile?.name?.[0] || user.uid[0]}
+              <div className="flex flex-col bg-[#0a0a0a] p-4 rounded-xl border border-[#222] gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-[#00FF00] rounded-full flex items-center justify-center text-black font-black text-xl uppercase shadow-[0_0_15px_rgba(0,255,0,0.3)]">
+                      {profile?.name?.[0] || user.uid[0]}
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-zinc-100">{profile?.name || 'Jogador'}</h2>
+                      <p className="text-xs tracking-wider text-[#00FF00] font-bold uppercase">{profile?.wins || 0} Vitórias • {profile?.totalScore || 0} PTS</p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="font-bold text-zinc-100">{profile?.name || 'Jogador'}</h2>
-                    <p className="text-xs tracking-wider text-[#00FF00] font-bold uppercase">{profile?.wins || 0} Vitórias • {profile?.wordsFound || 0} Palavras</p>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setIsWordBankOpen(true)} className="p-2.5 text-zinc-500 hover:text-[#00FF00] hover:bg-[#1a1a1a] transition rounded-lg" title="Banco de Palavras">
+                      <Database size={18} />
+                    </button>
+                    <button onClick={() => setIsEditingProfile(true)} className="p-2.5 text-zinc-500 hover:text-[#00FF00] hover:bg-[#1a1a1a] transition rounded-lg" title="Editar Perfil">
+                      <Edit2 size={18} />
+                    </button>
+                    <button onClick={logout} className="p-2.5 text-zinc-500 hover:text-red-500 hover:bg-[#1a1a1a] transition rounded-lg" title="Sair">
+                      <LogOut size={18} />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setIsWordBankOpen(true)} className="p-3 text-zinc-500 hover:text-[#00FF00] hover:bg-[#1a1a1a] transition rounded-lg" title="Banco de Palavras">
-                    <Database size={20} />
-                  </button>
-                  <button onClick={() => setIsEditingProfile(true)} className="p-3 text-zinc-500 hover:text-[#00FF00] hover:bg-[#1a1a1a] transition rounded-lg" title="Editar Perfil">
-                    <Edit2 size={20} />
-                  </button>
-                  <button onClick={logout} className="p-3 text-zinc-500 hover:text-red-500 hover:bg-[#1a1a1a] transition rounded-lg" title="Sair">
-                    <LogOut size={20} />
-                  </button>
+
+                {/* Persistent Stats Micro-grid */}
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#1a1a1a]">
+                  <div className="bg-[#141414] p-2 rounded-lg text-center border border-[#222]">
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Palavras</span>
+                    <span className="text-sm font-black text-zinc-200">{profile?.wordsFound || 0}</span>
+                  </div>
+                  <div className="bg-[#141414] p-2 rounded-lg text-center border border-[#222]">
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Partidas</span>
+                    <span className="text-sm font-black text-zinc-200">{profile?.gamesPlayed || 0}</span>
+                  </div>
+                  <div className="bg-[#141414] p-2 rounded-lg text-center border border-[#222]">
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Recorde</span>
+                    <span className="text-sm font-black text-[#00FF00]">{profile?.highestSingleGameScore || profile?.totalScore || 0}</span>
+                  </div>
                 </div>
               </div>
 

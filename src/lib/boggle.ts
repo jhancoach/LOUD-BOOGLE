@@ -45,3 +45,50 @@ export function isAdjacent(index1: number, index2: number, size: number = 4): bo
 export async function validateWord(word: string, minLength: number = 3): Promise<boolean> {
   return checkMasterWordBank(word, minLength);
 }
+
+/**
+ * Finds the sequence of board cell indices that form the given word.
+ * Returns null if no valid connected path exists on the board.
+ */
+export function findWordPath(word: string, board: string[], size: number = 4): number[] | null {
+  if (!word || !board || board.length === 0) return null;
+  const target = word.toUpperCase();
+
+  function dfs(currentIndex: number, letterPos: number, visited: Set<number>, path: number[]): number[] | null {
+    const cellLetter = (board[currentIndex] || '').toUpperCase();
+    const matchLen = cellLetter.length;
+
+    // Check if the current cell matches the target substring
+    if (target.substring(letterPos, letterPos + matchLen) !== cellLetter) {
+      return null;
+    }
+
+    const nextPos = letterPos + matchLen;
+    const newPath = [...path, currentIndex];
+
+    if (nextPos === target.length) {
+      return newPath;
+    }
+
+    const newVisited = new Set(visited);
+    newVisited.add(currentIndex);
+
+    // Search adjacent cells
+    for (let neighbor = 0; neighbor < board.length; neighbor++) {
+      if (!newVisited.has(neighbor) && isAdjacent(currentIndex, neighbor, size)) {
+        const result = dfs(neighbor, nextPos, newVisited, newPath);
+        if (result) return result;
+      }
+    }
+
+    return null;
+  }
+
+  // Start from any matching cell on the board
+  for (let startIdx = 0; startIdx < board.length; startIdx++) {
+    const result = dfs(startIdx, 0, new Set(), []);
+    if (result) return result;
+  }
+
+  return null;
+}

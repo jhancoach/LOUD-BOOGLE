@@ -1,18 +1,43 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { generateBoard, validateWord, isAdjacent } from '../lib/boggle';
-import { Play, Check, X, ArrowLeft, Clock } from 'lucide-react';
+import { Play, Check, X, ArrowLeft, RotateCcw, Sparkles, Volume2, VolumeX } from 'lucide-react';
 import { suggestWord } from '../lib/room';
+import AnimatedTimer from '../components/AnimatedTimer';
+import BoardReplay from '../components/BoardReplay';
+import { useAuth } from '../components/AuthProvider';
+import { db } from '../lib/firebase';
+import { doc, updateDoc, increment } from 'firebase/firestore';
+import { fireWinnerConfetti } from '../lib/confetti';
+import { 
+  playSelectLetter, 
+  playWordSuccess, 
+  playWordError, 
+  playTimerTick, 
+  playGameOver, 
+  playVictorySound, 
+  isAudioMuted, 
+  setAudioMuted 
+} from '../lib/sounds';
 
 export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, minWordLength = 3 }: { onLeave: () => void, duration?: number, gridSize?: number, minWordLength?: number }) {
+  const { user, profile } = useAuth();
   const [board, setBoard] = useState<string[]>([]);
   const [timeLeft, setTimeLeft] = useState(duration);
   const [status, setStatus] = useState<'waiting' | 'playing' | 'gameover'>('waiting');
+  const [muted, setMuted] = useState(isAudioMuted());
   
   const [currentWord, setCurrentWord] = useState<{index: number, letter: string}[]>([]);
   const [words, setWords] = useState<{word: string, score: number}[]>([]);
   const [message, setMessage] = useState<{text: string, type: 'success' | 'error', word?: string} | null>(null);
+  const [hasSavedSoloStats, setHasSavedSoloStats] = useState(false);
   
   const boardRef = useRef<HTMLDivElement>(null);
+
+  const handleToggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    setAudioMuted(next);
+  };
 
   useEffect(() => {
     if (status === 'waiting') {
@@ -21,6 +46,7 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
       setWords([]);
       setCurrentWord([]);
       setMessage(null);
+      setHasSavedSoloStats(false);
     }
   }, [status, gridSize, duration]);
 
@@ -33,12 +59,37 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
             setStatus('gameover');
             return 0;
           }
+          if (prev <= 10 && prev > 1) {
+            playTimerTick(prev <= 5);
+          }
           return prev - 1;
         });
       }, 1000);
     }
     return () => clearInterval(timer);
   }, [status, timeLeft]);
+
+  // Persiste estatísticas de treino para o usuário se estiver logado
+  useEffect(() => {
+    if (status === 'gameover') {
+      if (words.length > 0) {
+        playVictorySound();
+        fireWinnerConfetti();
+      } else {
+        playGameOver();
+      }
+      if (user && !hasSavedSoloStats && words.length > 0) {
+        setHasSavedSoloStats(true);
+        const totalScore = words.reduce((sum, w) => sum + w.score, 0);
+        const userRef = doc(db, 'users', user.uid);
+        updateDoc(userRef, {
+          totalScore: increment(totalScore),
+          wordsFound: increment(words.length),
+          gamesPlayed: increment(1)
+        }).catch(err => console.warn("Solo stats persistence warning:", err));
+      }
+    }
+  }, [status, user, hasSavedSoloStats, words]);
 
   const startGame = () => setStatus('playing');
   const restartGame = () => setStatus('waiting');
@@ -51,6 +102,7 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
   const handlePointerDown = (e: React.PointerEvent, index: number, letter: string) => {
     if (status !== 'playing' || timeLeft === 0) return;
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    playSelectLetter(0);
     setCurrentWord([{ index, letter }]);
     setMessage(null);
   };
@@ -62,11 +114,13 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
     if (currentWord.some(w => w.index === index)) {
       if (currentWord.length > 1 && currentWord[currentWord.length - 2].index === index) {
         setCurrentWord(prev => prev.slice(0, -1));
+        playSelectLetter(currentWord.length - 2);
       }
       return;
     }
 
     if (isAdjacent(lastIndex, index, gridSize)) {
+      playSelectLetter(currentWord.length);
       setCurrentWord(prev => [...prev, { index, letter }]);
     }
   };
@@ -78,11 +132,13 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
     setCurrentWord([]);
 
     if (wordStr.length < minWordLength) {
+      playWordError();
       setMessage({ text: `Muito curta! Mínimo de ${minWordLength} letras.`, type: 'error' });
       return;
     }
 
     if (words.some(w => w.word === wordStr)) {
+      playWordError();
       setMessage({ text: 'Palavra já encontrada!', type: 'error' });
       return;
     }
@@ -90,20 +146,24 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
     const isValid = await validateWord(wordStr);
     if (isValid) {
       const score = Math.max(1, wordStr.length - 2);
+      playWordSuccess(score);
       setWords(prev => [{word: wordStr, score}, ...prev]);
-      setMessage({ text: 'Palavra válida!', type: 'success' });
+      setMessage({ text: `Palavra válida! +${score} pts`, type: 'success' });
     } else {
+      playWordError();
       setMessage({ text: 'Palavra não encontrada.', type: 'error', word: wordStr });
     }
   };
 
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
-
   const totalScore = words.reduce((sum, w) => sum + w.score, 0);
+
+  // Mock player object for Replay compatibility
+  const soloPlayer = [{
+    id: user?.uid || 'solo',
+    name: profile?.name || user?.displayName || 'Você',
+    words: words.map(w => w.word),
+    score: totalScore
+  }];
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans p-4 md:p-8 select-none">
@@ -113,9 +173,16 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
             <span className="text-[10px] font-black uppercase tracking-widest text-[#00FF00] bg-[#00FF00]/10 px-2 py-0.5 rounded border border-[#00FF00]/30">LOUD BOOGLE</span>
             <h1 className="text-2xl font-black text-zinc-100 uppercase tracking-widest mt-1">Modo Treino</h1>
           </div>
-          <div className="flex gap-4 items-center">
+          <div className="flex gap-3 items-center">
+            <button 
+              onClick={handleToggleMute} 
+              className="p-2.5 bg-[#1a1a1a] hover:bg-[#222] text-zinc-400 hover:text-zinc-200 rounded-xl border border-[#333] transition"
+              title={muted ? "Ativar Som" : "Silenciar Som"}
+            >
+              {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+            </button>
             <button onClick={onLeave} className="px-4 py-2 bg-[#1a1a1a] text-zinc-400 font-bold uppercase tracking-widest text-sm rounded-xl hover:bg-[#222] border border-[#333] transition flex items-center gap-2">
-              <ArrowLeft size={20} /> Sair
+              <ArrowLeft size={18} /> Sair
             </button>
           </div>
         </header>
@@ -129,14 +196,16 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
           </div>
         )}
 
-        {(status === 'playing' || status === 'gameover') && (
+        {status === 'playing' && (
           <div className="flex flex-col md:flex-row gap-6">
             <div className="flex-1 bg-[#141414] p-6 rounded-3xl shadow-[0_0_20px_rgba(0,0,0,0.8)] border border-[#222] flex flex-col items-center">
               <div className="w-full flex justify-between items-center mb-6">
-                <div className="text-2xl font-black font-mono flex items-center gap-2">
-                  <Clock size={24} className={timeLeft <= 10 ? 'text-red-500' : 'text-[#00FF00]'} />
-                  <span className={timeLeft <= 10 ? 'text-red-500 animate-pulse drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'text-[#00FF00] drop-shadow-[0_0_10px_rgba(0,255,0,0.3)]'}>{formatTime(timeLeft)}</span>
-                </div>
+                <AnimatedTimer
+                  timeLeft={timeLeft}
+                  totalDuration={duration}
+                  size="md"
+                  showProgressRing={true}
+                />
                 <div className="text-2xl font-black text-[#00FF00] drop-shadow-[0_0_10px_rgba(0,255,0,0.2)]">{totalScore} <span className="text-xs text-zinc-600 font-bold uppercase tracking-widest">pts</span></div>
               </div>
               
@@ -188,15 +257,6 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
                   );
                 })}
               </div>
-
-              {status === 'gameover' && (
-                <div className="mt-8 text-center animate-in fade-in zoom-in">
-                  <h2 className="text-3xl font-black mb-4 text-[#00FF00] uppercase tracking-widest drop-shadow-[0_0_15px_rgba(0,255,0,0.3)]">Tempo Esgotado!</h2>
-                  <button onClick={restartGame} className="bg-[#111] border border-[#333] text-zinc-300 px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-[#222] transition">
-                    Treinar Novamente
-                  </button>
-                </div>
-              )}
             </div>
 
             <div className="w-full md:w-80 flex flex-col gap-4">
@@ -215,6 +275,27 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {status === 'gameover' && (
+          <div className="flex flex-col gap-6 animate-in fade-in zoom-in duration-500">
+            <div className="bg-[#141414] p-6 rounded-3xl border border-[#222] flex justify-between items-center">
+              <div>
+                <h2 className="text-3xl font-black text-[#00FF00] uppercase tracking-widest drop-shadow-[0_0_15px_rgba(0,255,0,0.3)]">Treino Concluído!</h2>
+                <p className="text-zinc-400 font-bold uppercase tracking-widest text-xs mt-1">Pontuação Final: {totalScore} pontos • {words.length} palavras</p>
+              </div>
+              <button onClick={restartGame} className="bg-[#00FF00] text-black px-6 py-3 rounded-xl font-black uppercase tracking-widest text-sm hover:bg-[#00e600] transition flex items-center gap-2 shadow-[0_0_15px_rgba(0,255,0,0.2)]">
+                <RotateCcw size={18} /> Treinar Novamente
+              </button>
+            </div>
+
+            {/* Board Replay for Solo / Offline Training */}
+            <BoardReplay 
+              board={board} 
+              gridSize={gridSize} 
+              players={soloPlayer}
+            />
           </div>
         )}
       </div>

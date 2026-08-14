@@ -23,22 +23,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(currentUser);
       if (currentUser) {
         const docRef = doc(db, 'users', currentUser.uid);
-        const docSnap = await getDoc(docRef);
-        if (!docSnap.exists()) {
-          const newProfile = {
+        try {
+          const docSnap = await getDoc(docRef);
+          if (!docSnap.exists()) {
+            const newProfile = {
+              name: currentUser.displayName || 'Jogador ' + currentUser.uid.substring(0, 5),
+              wins: 0,
+              wordsFound: 0,
+              totalScore: 0
+            };
+            await setDoc(docRef, newProfile, { merge: true });
+            setProfile(newProfile);
+          } else {
+            setProfile(docSnap.data());
+          }
+        } catch (e) {
+          console.warn("Firestore offline/fallback for user profile:", e);
+          setProfile({
             name: currentUser.displayName || 'Jogador ' + currentUser.uid.substring(0, 5),
             wins: 0,
             wordsFound: 0,
             totalScore: 0
-          };
-          await setDoc(docRef, newProfile);
+          });
         }
         
-        unsubProfile = onSnapshot(docRef, (docSnap) => {
-          if (docSnap.exists()) {
-            setProfile(docSnap.data());
-          }
-        });
+        try {
+          unsubProfile = onSnapshot(docRef, (docSnap) => {
+            if (docSnap.exists()) {
+              setProfile(docSnap.data());
+            }
+          }, (err) => {
+            console.warn("User onSnapshot warning:", err);
+          });
+        } catch (e) {
+          console.warn("Error setting onSnapshot for user doc:", e);
+        }
       } else {
         setProfile(null);
         if (unsubProfile) unsubProfile();
