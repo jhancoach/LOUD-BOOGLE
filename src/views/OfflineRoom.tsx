@@ -119,21 +119,32 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
 
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  const [isFakeFullscreen, setIsFakeFullscreen] = useState(false);
+
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
+      if (!document.fullscreenElement) {
+        setIsFakeFullscreen(false);
+      }
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
   const toggleFullscreen = async () => {
-    if (!document.fullscreenElement) {
-      await document.documentElement.requestFullscreen().catch(err => {
-        console.error("Error attempting to enable fullscreen:", err);
-      });
-    } else if (document.exitFullscreen) {
-      await document.exitFullscreen();
+    if (document.fullscreenEnabled) {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen().catch(err => {
+          console.error("Error attempting to enable fullscreen:", err);
+          setIsFakeFullscreen(true);
+        });
+      } else {
+        await document.exitFullscreen();
+        setIsFakeFullscreen(false);
+      }
+    } else {
+      setIsFakeFullscreen(!isFakeFullscreen);
     }
   };
 
@@ -178,34 +189,27 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
   const tileRectsRef = useRef<{index: number, rect: DOMRect, centerX: number, centerY: number}[]>([]);
 
   const getTileIndexFromCoords = (clientX: number, clientY: number): number | null => {
+    if (tileRectsRef.current.length === 0) return null;
+
     let closestIndex: number | null = null;
     let minDistance = Infinity;
-    // Tolerance for snapping to a tile
-    const maxDistance = 80;
+    
+    // Determine the size of a single tile from the first element
+    const tileWidth = tileRectsRef.current[0].rect.width;
+    const maxDistance = tileWidth * 1.5; // Generous outer boundary to catch fast diagonal swipes
 
-    for (const {index, rect, centerX, centerY} of tileRectsRef.current) {
-      const expand = 30; // generous expansion around hitboxes
-      if (clientX >= rect.left - expand && clientX <= rect.right + expand &&
-          clientY >= rect.top - expand && clientY <= rect.bottom + expand) {
-          
-          const dist = Math.hypot(clientX - centerX, clientY - centerY);
-          if (dist < minDistance && dist < maxDistance) {
+    for (const {index, centerX, centerY} of tileRectsRef.current) {
+        const dist = Math.hypot(clientX - centerX, clientY - centerY);
+        if (dist < minDistance) {
             minDistance = dist;
             closestIndex = index;
-          }
-      }
+        }
     }
 
-    if (closestIndex !== null) return closestIndex;
-
-    const el = document.elementFromPoint(clientX, clientY);
-    if (el) {
-      const tile = el.closest('[data-index]');
-      if (tile) {
-        const indexStr = tile.getAttribute('data-index');
-        if (indexStr !== null) return parseInt(indexStr, 10);
-      }
+    if (closestIndex !== null && minDistance < maxDistance) {
+        return closestIndex;
     }
+
     return null;
   };
 
@@ -356,6 +360,12 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
         processDragMove(e.touches[0].clientX, e.touches[0].clientY);
       }
     };
+    const handleWindowMouseMove = (e: MouseEvent | PointerEvent) => {
+      if (isDraggingRef.current) {
+        if (e.cancelable) e.preventDefault();
+        processDragMove(e.clientX, e.clientY);
+      }
+    };
     const handleWindowTouchEnd = (e: TouchEvent) => {
       if (isDraggingRef.current) {
         if (e.cancelable) e.preventDefault();
@@ -369,6 +379,8 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
     };
 
     window.addEventListener('touchmove', handleWindowTouchMove, { passive: false });
+    window.addEventListener('mousemove', handleWindowMouseMove, { passive: false });
+    window.addEventListener('pointermove', handleWindowMouseMove, { passive: false });
     window.addEventListener('touchend', handleWindowTouchEnd, { passive: false });
     window.addEventListener('touchcancel', handleWindowTouchEnd, { passive: false });
     window.addEventListener('pointerup', handleWindowPointerUp);
@@ -376,6 +388,8 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
 
     return () => {
       window.removeEventListener('touchmove', handleWindowTouchMove);
+      window.removeEventListener('mousemove', handleWindowMouseMove);
+      window.removeEventListener('pointermove', handleWindowMouseMove);
       window.removeEventListener('touchend', handleWindowTouchEnd);
       window.removeEventListener('touchcancel', handleWindowTouchEnd);
       window.removeEventListener('pointerup', handleWindowPointerUp);
@@ -394,7 +408,7 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
   }];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans p-3 sm:p-4 md:p-8 select-none">
+    <div className={`min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans p-3 sm:p-4 md:p-8 select-none ${isFakeFullscreen ? 'fixed inset-0 z-[100] overflow-y-auto w-full h-full' : ''}`}>
       <div className="max-w-4xl mx-auto flex flex-col gap-5 sm:gap-6">
         <header className="bg-[#141414] p-4 sm:p-6 rounded-3xl shadow-[0_0_20px_rgba(0,0,0,0.8)] border border-[#222] flex justify-between items-center">
           <div>
