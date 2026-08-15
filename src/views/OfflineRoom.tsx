@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { generateBoard, validateWord, isAdjacent } from '../lib/boggle';
-import { Play, Check, X, ArrowLeft, RotateCcw, Sparkles, Volume2, VolumeX } from 'lucide-react';
+import { Play, Check, X, ArrowLeft, RotateCcw, Sparkles, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
 import { suggestWord } from '../lib/room';
 import AnimatedTimer from '../components/AnimatedTimer';
 import BoardReplay from '../components/BoardReplay';
@@ -117,6 +117,26 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
   const startGame = () => setStatus('playing');
   const restartGame = () => setStatus('waiting');
 
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen().catch(err => {
+        console.error("Error attempting to enable fullscreen:", err);
+      });
+    } else if (document.exitFullscreen) {
+      await document.exitFullscreen();
+    }
+  };
+
   const handleSuggest = async (word: string) => {
     await suggestWord(word, 'offline-user');
     setMessage({ text: 'Palavra sugerida com sucesso!', type: 'success' });
@@ -155,24 +175,29 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
   const gridRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
   const lastTouchTimeRef = useRef(0);
+  const tileRectsRef = useRef<{index: number, rect: DOMRect, centerX: number, centerY: number}[]>([]);
 
   const getTileIndexFromCoords = (clientX: number, clientY: number): number | null => {
-    if (gridRef.current) {
-      const rect = gridRef.current.getBoundingClientRect();
-      const margin = 20; // 20px padding margin around board edges
-      if (clientX >= rect.left - margin && clientX <= rect.right + margin &&
-          clientY >= rect.top - margin && clientY <= rect.bottom + margin) {
-        const size = gridSize || 4;
-        const clampedX = Math.max(rect.left, Math.min(rect.right - 1, clientX));
-        const clampedY = Math.max(rect.top, Math.min(rect.bottom - 1, clientY));
-        const col = Math.floor(((clampedX - rect.left) / rect.width) * size);
-        const row = Math.floor(((clampedY - rect.top) / rect.height) * size);
-        if (col >= 0 && col < size && row >= 0 && row < size) {
-          const idx = row * size + col;
-          if (idx >= 0 && idx < size * size) return idx;
-        }
+    let closestIndex: number | null = null;
+    let minDistance = Infinity;
+    // Tolerance for snapping to a tile
+    const maxDistance = 80;
+
+    for (const {index, rect, centerX, centerY} of tileRectsRef.current) {
+      const expand = 30; // generous expansion around hitboxes
+      if (clientX >= rect.left - expand && clientX <= rect.right + expand &&
+          clientY >= rect.top - expand && clientY <= rect.bottom + expand) {
+          
+          const dist = Math.hypot(clientX - centerX, clientY - centerY);
+          if (dist < minDistance && dist < maxDistance) {
+            minDistance = dist;
+            closestIndex = index;
+          }
       }
     }
+
+    if (closestIndex !== null) return closestIndex;
+
     const el = document.elementFromPoint(clientX, clientY);
     if (el) {
       const tile = el.closest('[data-index]');
@@ -186,6 +211,19 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
 
   const startDrag = (index: number, letter: string, e?: React.SyntheticEvent) => {
     if (status !== 'playing' || timeLeft === 0) return;
+
+    if (gridRef.current) {
+      const tiles = gridRef.current.querySelectorAll('[data-index]');
+      tileRectsRef.current = Array.from(tiles).map(t => {
+        const rect = t.getBoundingClientRect();
+        return {
+          index: parseInt(t.getAttribute('data-index')!, 10),
+          rect,
+          centerX: rect.left + rect.width / 2,
+          centerY: rect.top + rect.height / 2
+        };
+      });
+    }
 
     const now = Date.now();
     if (e?.type === 'touchstart') {
@@ -363,7 +401,14 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
             <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-[#00FF00] bg-[#00FF00]/10 px-2 py-0.5 rounded border border-[#00FF00]/30">LOUD BOOGLE</span>
             <h1 className="text-xl sm:text-2xl font-black text-zinc-100 uppercase tracking-widest mt-0.5 sm:mt-1">Modo Treino</h1>
           </div>
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-2 sm:gap-3 items-center">
+            <button 
+              onClick={toggleFullscreen} 
+              className="p-2.5 bg-[#1a1a1a] hover:bg-[#222] text-zinc-400 hover:text-zinc-200 rounded-xl border border-[#333] transition"
+              title={isFullscreen ? "Sair da Tela Cheia" : "Tela Cheia"}
+            >
+              {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+            </button>
             <button 
               onClick={handleToggleMute} 
               className="p-2.5 bg-[#1a1a1a] hover:bg-[#222] text-zinc-400 hover:text-zinc-200 rounded-xl border border-[#333] transition"
@@ -371,8 +416,8 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
             >
               {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
             </button>
-            <button onClick={onLeave} className="px-4 py-2 bg-[#1a1a1a] text-zinc-400 font-bold uppercase tracking-widest text-sm rounded-xl hover:bg-[#222] border border-[#333] transition flex items-center gap-2">
-              <ArrowLeft size={18} /> Sair
+            <button onClick={onLeave} className="px-3 sm:px-4 py-2 bg-[#1a1a1a] text-zinc-400 font-bold uppercase tracking-widest text-xs sm:text-sm rounded-xl hover:bg-[#222] border border-[#333] transition flex items-center gap-2">
+              <ArrowLeft size={16} /> <span className="hidden sm:inline">Sair</span>
             </button>
           </div>
         </header>

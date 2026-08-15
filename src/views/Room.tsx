@@ -4,10 +4,11 @@ import { db } from '../lib/firebase';
 import { doc, collection, onSnapshot, query, updateDoc } from 'firebase/firestore';
 import { joinRoom, startGame, addWordToPlayer, saveFinalStats, resetPlayer, restartGame, suggestWord, updateRoomSettings, transferHost } from '../lib/room';
 import { isAdjacent, validateWord, generateBoard, getScore } from '../lib/boggle';
-import { Play, Loader2, Check, X, ArrowLeft, Trophy, Users, Clock, Crown, QrCode, MonitorPlay, Settings, Menu, Smile, BookOpen, Medal, Hourglass, User, Database, Share2, Sparkles, Volume2, VolumeX, Eye, Minus, Plus } from 'lucide-react';
+import { Play, Loader2, Check, X, ArrowLeft, Trophy, Users, Clock, Crown, QrCode, MonitorPlay, Settings, Menu, Smile, BookOpen, Medal, Hourglass, User, Database, Share2, Sparkles, Volume2, VolumeX, Eye, Minus, Plus, Maximize, Minimize } from 'lucide-react';
 import WordBankModal from '../components/WordBankModal';
 import AnimatedTimer from '../components/AnimatedTimer';
 import BoardReplay from '../components/BoardReplay';
+import TvBoardReplay from '../components/TvBoardReplay';
 import QRCode from 'react-qr-code';
 import { fireWinnerConfetti, startVictoryLoop } from '../lib/confetti';
 import { playSelectLetter, playWordSuccess, playWordError, playTimerTick, playGameOver, playVictorySound, isAudioMuted, toggleAudioMute } from '../lib/sounds';
@@ -26,6 +27,7 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | 'info'; word?: string } | null>(null);
   const [muted, setMuted] = useState(isAudioMuted());
   const [tvGameOverTab, setTvGameOverTab] = useState<'podium' | 'replay'>('replay');
+  const [showTvReplay, setShowTvReplay] = useState(true);
   const [loadTimedOut, setLoadTimedOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -189,24 +191,48 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
   const gridRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
   const lastTouchTimeRef = useRef(0);
+  const tileRectsRef = useRef<{index: number, rect: DOMRect, centerX: number, centerY: number}[]>([]);
+
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen().catch(err => {
+        console.error("Error attempting to enable fullscreen:", err);
+      });
+    } else if (document.exitFullscreen) {
+      await document.exitFullscreen();
+    }
+  };
 
   const getTileIndexFromCoords = (clientX: number, clientY: number): number | null => {
-    if (gridRef.current) {
-      const rect = gridRef.current.getBoundingClientRect();
-      const margin = 20; // 20px padding margin around board edges
-      if (clientX >= rect.left - margin && clientX <= rect.right + margin &&
-          clientY >= rect.top - margin && clientY <= rect.bottom + margin) {
-        const size = roomGridSize || 4;
-        const clampedX = Math.max(rect.left, Math.min(rect.right - 1, clientX));
-        const clampedY = Math.max(rect.top, Math.min(rect.bottom - 1, clientY));
-        const col = Math.floor(((clampedX - rect.left) / rect.width) * size);
-        const row = Math.floor(((clampedY - rect.top) / rect.height) * size);
-        if (col >= 0 && col < size && row >= 0 && row < size) {
-          const idx = row * size + col;
-          if (idx >= 0 && idx < size * size) return idx;
-        }
+    let closestIndex: number | null = null;
+    let minDistance = Infinity;
+    const maxDistance = 80;
+
+    for (const {index, rect, centerX, centerY} of tileRectsRef.current) {
+      const expand = 30;
+      if (clientX >= rect.left - expand && clientX <= rect.right + expand &&
+          clientY >= rect.top - expand && clientY <= rect.bottom + expand) {
+          
+          const dist = Math.hypot(clientX - centerX, clientY - centerY);
+          if (dist < minDistance && dist < maxDistance) {
+            minDistance = dist;
+            closestIndex = index;
+          }
       }
     }
+
+    if (closestIndex !== null) return closestIndex;
+
     const el = document.elementFromPoint(clientX, clientY);
     if (el) {
       const tile = el.closest('[data-index]');
@@ -252,6 +278,19 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
 
   const startDrag = (index: number, e?: React.SyntheticEvent) => {
     if (room?.status !== 'playing' || isChecking) return;
+
+    if (gridRef.current) {
+      const tiles = gridRef.current.querySelectorAll('[data-index]');
+      tileRectsRef.current = Array.from(tiles).map(t => {
+        const rect = t.getBoundingClientRect();
+        return {
+          index: parseInt(t.getAttribute('data-index')!, 10),
+          rect,
+          centerX: rect.left + rect.width / 2,
+          centerY: rect.top + rect.height / 2
+        };
+      });
+    }
 
     const now = Date.now();
     if (e?.type === 'touchstart') {
@@ -636,30 +675,11 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
 
         {/* Game Over Modal / Results over the board if needed */}
         {isGameOver && (
-          <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-8 animate-in fade-in duration-500">
-             <div className="bg-[#141414] border border-white/10 p-10 rounded-[3rem] shadow-2xl max-w-4xl w-full flex flex-col items-center">
-                <Trophy size={80} className="text-yellow-400 mb-6 drop-shadow-[0_0_20px_rgba(250,204,21,0.4)]" />
-                <h2 className="text-5xl font-black uppercase tracking-widest text-white mb-2">Fim da Partida!</h2>
-                <p className="text-zinc-500 font-bold uppercase tracking-[0.3em] mb-12">Confira o vencedor na tela do celular</p>
-                
-                <div className="grid grid-cols-3 gap-6 w-full">
-                  {computedPlayers.slice(0, 3).map((p, i) => (
-                    <div key={p.id} className="bg-[#1a1a1a] p-6 rounded-3xl border border-white/5 flex flex-col items-center">
-                      <div className="text-4xl font-black text-[#00FF00] mb-2">{p.finalScore}</div>
-                      <div className="text-sm font-black uppercase tracking-wider text-white truncate w-full text-center">{p.name}</div>
-                      <div className="text-[10px] font-bold uppercase text-zinc-500 mt-1 tracking-widest">{p.scoredWords?.length || 0} palavras</div>
-                    </div>
-                  ))}
-                </div>
-
-                <button 
-                  onClick={onLeave}
-                  className="mt-12 px-10 py-4 bg-white text-black font-black rounded-2xl uppercase tracking-[0.2em] hover:scale-105 transition active:scale-95"
-                >
-                  Fechar Partida
-                </button>
-             </div>
-          </div>
+          <TvBoardReplay 
+            board={room.board || []} 
+            gridSize={room.gridSize || 4} 
+            players={players} 
+          />
         )}
       </div>
     );
@@ -774,6 +794,12 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
                </div>
              </div>
              <div className="flex gap-4 w-full md:w-auto">
+               <button 
+                 onClick={() => setShowTvReplay(true)}
+                 className="flex-1 md:flex-none px-6 py-3 bg-[#4c1d95] text-white font-black rounded-xl hover:bg-[#5b21b6] transition flex items-center justify-center gap-2 uppercase tracking-wider shadow-[0_0_15px_rgba(109,40,217,0.4)]"
+               >
+                 <Trophy size={20} /> Animação do Pódio
+               </button>
                <button onClick={onLeave} className="flex-1 md:flex-none px-6 py-3 bg-[#111] text-zinc-300 border border-[#333] font-bold rounded-xl hover:bg-[#222] transition text-center uppercase tracking-wider text-sm">
                  Sair da Sala
                </button>
@@ -784,6 +810,15 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
                )}
              </div>
            </header>
+
+           {showTvReplay && (
+             <TvBoardReplay 
+               board={room.board || []} 
+               gridSize={room.gridSize || 4} 
+               players={players} 
+               onClose={() => setShowTvReplay(false)}
+             />
+           )}
 
            {isWinner && (
              <div className="bg-gradient-to-r from-[#00FF00]/10 via-[#00FF00]/20 to-[#00FF00]/10 border-2 border-[#00FF00] p-4 rounded-2xl flex items-center justify-between shadow-[0_0_30px_rgba(0,255,0,0.25)] animate-in fade-in zoom-in">
@@ -877,6 +912,13 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
             </div>
             
             <div className="flex gap-2 items-center">
+              <button
+                onClick={toggleFullscreen}
+                className="p-2.5 bg-[#1a1a1a] hover:bg-[#222] text-zinc-400 hover:text-zinc-200 rounded-xl border border-[#333] transition"
+                title={isFullscreen ? "Sair da Tela Cheia" : "Tela Cheia"}
+              >
+                {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+              </button>
               <button
                 onClick={handleToggleMute}
                 className="p-2.5 bg-[#1a1a1a] hover:bg-[#222] text-zinc-400 hover:text-zinc-200 rounded-xl border border-[#333] transition"
