@@ -14,6 +14,7 @@ export interface PlayerWordRecord {
 interface BoardReplayProps {
   board: string[];
   gridSize: number;
+  minWordLength?: number;
   players: {
     id: string;
     name: string;
@@ -30,7 +31,7 @@ const SPEED_CONFIG: Record<PlaybackSpeed, { label: string; letterDelay: number; 
   fast: { label: 'Rápida', letterDelay: 90, wordPause: 400, icon: '🚀' },
 };
 
-export default function BoardReplay({ board, gridSize = 4, players, currentUserId }: BoardReplayProps) {
+export default function BoardReplay({ board, gridSize = 4, minWordLength = 3, players, currentUserId }: BoardReplayProps) {
   // Aggregate and deduplicate all words with metadata
   const allWordRecords = useMemo(() => {
     const map = new Map<string, { word: string; score: number; foundBy: string[]; playerIds: string[] }>();
@@ -79,7 +80,7 @@ export default function BoardReplay({ board, gridSize = 4, players, currentUserI
     let isMounted = true;
     if (board && board.length > 0) {
       setIsLoadingPossible(true);
-      findAllPossibleWords(board, gridSize, 3).then(res => {
+      findAllPossibleWords(board, gridSize, minWordLength).then(res => {
         if (isMounted) {
           setPossibleData(res);
           setIsLoadingPossible(false);

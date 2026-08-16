@@ -225,28 +225,11 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
   };
 
   const getTileIndexFromCoords = (clientX: number, clientY: number): number | null => {
-    if (tileRectsRef.current.length === 0) return null;
-
-    let closestIndex: number | null = null;
-    let minDistance = Infinity;
-    
-    // Determine the size of a single tile from the first element
-    const tileWidth = tileRectsRef.current[0].rect.width;
-    const maxDistance = tileWidth * 1.5; // Generous outer boundary to catch fast diagonal swipes
-
-    for (const {index, centerX, centerY} of tileRectsRef.current) {
-        const dist = Math.hypot(clientX - centerX, clientY - centerY);
-        if (dist < minDistance) {
-            minDistance = dist;
-            closestIndex = index;
-        }
-    }
-
-    if (closestIndex !== null && minDistance < maxDistance) {
-        return closestIndex;
-    }
-
-    return null;
+    const el = document.elementFromPoint(clientX, clientY);
+    if (!el) return null;
+    const tile = el.closest('[data-index]');
+    if (!tile) return null;
+    return parseInt(tile.getAttribute('data-index')!, 10);
   };
 
   const submitWordFromPath = async (pathToSubmit: number[]) => {
@@ -706,7 +689,7 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
 
   if (!isHost && !isTV && room.status === 'waiting') {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] font-sans flex flex-col p-6 items-center relative overflow-hidden">
+      <div className="min-h-screen bg-[#0a0a0a] font-sans flex flex-col p-6 items-center relative overflow-y-auto overflow-x-hidden">
         <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-[#00FF00]/10 blur-[80px] pointer-events-none rounded-full"></div>
 
         {/* Top Nav */}
@@ -785,7 +768,8 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
     
     return (
       <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans p-4 md:p-8">
-         <div className="max-w-6xl mx-auto flex flex-col gap-6">
+         {/* Desktop / TV Layout */}
+         <div className="max-w-6xl mx-auto hidden md:flex flex-col gap-6">
            <header className="bg-[#141414] p-6 rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-[#222] flex flex-col md:flex-row justify-between items-center gap-4">
              <div className="flex items-center gap-6">
                <div className="hidden md:block bg-white p-2 rounded-xl shadow-[0_0_15px_rgba(0,255,0,0.15)] border-2 border-[#00FF00]">
@@ -866,7 +850,8 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
            {/* Interactive Board Replay with Speed Controls & Letter Path Tracing */}
            <BoardReplay 
              board={room.board || []} 
-             gridSize={room.gridSize || 4} 
+             gridSize={room.gridSize || 4}
+             minWordLength={room.minWordLength || 3}
              players={players}
              currentUserId={user?.uid}
            />
@@ -911,7 +896,33 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
              })}
            </div>
          </div>
+
+      {/* Mobile Layout */}
+      <div className="flex md:hidden flex-col items-center justify-center min-h-[80vh] gap-8">
+         <div className="bg-[#141414] p-8 rounded-3xl border border-[#222] shadow-[0_0_40px_rgba(0,0,0,0.8)] w-full max-w-sm flex flex-col items-center text-center">
+           <Trophy size={48} className={isWinner ? "text-[#00FF00] mb-4" : "text-zinc-500 mb-4"} />
+           <h2 className="text-3xl font-black text-[#00FF00] uppercase tracking-widest drop-shadow-[0_0_10px_rgba(0,255,0,0.3)]">Fim de Jogo</h2>
+           <p className="text-zinc-400 font-bold uppercase tracking-widest text-xs mt-2">
+              Olhe para a tela principal para ver os resultados
+           </p>
+           
+           <div className="mt-8 w-full">
+            {isHost ? (
+              <button onClick={() => restartGame(roomId, room?.gridSize || 4)} className="w-full px-6 py-4 bg-[#00FF00] text-black font-black rounded-2xl hover:bg-[#00e600] transition flex items-center justify-center gap-2 uppercase tracking-wider shadow-[0_0_20px_rgba(0,255,0,0.3)]">
+                <Play size={20} /> Jogar Novamente
+              </button>
+            ) : (
+              <div className="w-full px-6 py-4 bg-[#1a1a1a] text-zinc-500 font-bold rounded-2xl border border-[#333] flex items-center justify-center text-center uppercase tracking-wider text-xs">
+                Aguardando o Anfitrião...
+              </div>
+            )}
+            <button onClick={onLeave} className="w-full mt-4 px-6 py-3 bg-transparent text-zinc-500 font-bold rounded-xl transition text-center uppercase tracking-wider text-xs border border-[#333]">
+              Sair da Sala
+            </button>
+           </div>
+         </div>
       </div>
+    </div>
     );
   }
 
@@ -963,167 +974,173 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
             </div>
           </header>
 
-          <div 
-            className="bg-[#141414] p-3 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-[#222] select-none touch-none mb-4 relative overflow-hidden"
-            style={{ touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
-          >
-            {room.status === 'waiting' && (
-              <div className="absolute inset-0 z-20 bg-[#0a0a0a]/98 backdrop-blur-md rounded-2xl flex flex-col p-4 overflow-y-auto custom-scrollbar">
-                
-                {/* QR Section - Compact */}
-                <div className="flex flex-col items-center mb-4">
-                  <div className="w-full bg-[#111] p-3 rounded-2xl border border-[#222] mb-3 flex flex-col items-center">
-                    <div className="bg-white p-2 rounded-xl mb-3 shadow-[0_0_15px_rgba(0,255,0,0.2)]">
-                      <QRCode value={joinUrl} size={90} viewBox={`0 0 256 256`} />
-                    </div>
-                    <div className="flex gap-2 w-full">
-                       <button 
-                         onClick={() => {
-                           navigator.clipboard.writeText(joinUrl);
-                           showMessage('Link copiado!', 'success');
-                         }}
-                         className="flex-1 py-2 bg-[#1a1a1a] text-zinc-300 rounded-xl font-black text-[10px] uppercase tracking-wider border border-[#333] flex items-center justify-center gap-1.5"
-                       >
-                         <Share2 size={14} /> Link
-                       </button>
-                       <button 
-                         onClick={() => window.open(`/?room=${roomId.toUpperCase()}&tv=true`, '_blank')}
-                         className="flex-1 py-2 bg-[#1a1a1a] text-[#00FF00] rounded-xl font-black text-[10px] uppercase tracking-wider border border-[#00FF00]/20 flex items-center justify-center gap-1.5"
-                       >
-                         <MonitorPlay size={14} /> TV
-                       </button>
-                    </div>
+          {room.status === 'waiting' && (
+            <div className="bg-[#141414] rounded-2xl flex flex-col p-4 border border-[#222] shadow-[0_0_40px_rgba(0,0,0,0.8)] mb-4">
+              
+              {/* QR Section - Compact */}
+              <div className="flex flex-col items-center mb-4">
+                <div className="w-full bg-[#111] p-3 rounded-2xl border border-[#222] mb-3 flex flex-col items-center">
+                  <div className="bg-white p-2 rounded-xl mb-3 shadow-[0_0_15px_rgba(0,255,0,0.2)]">
+                    <QRCode value={joinUrl} size={90} viewBox={`0 0 256 256`} />
                   </div>
-                </div>
-
-                {/* Players List in Lobby - Higher Position */}
-                <div className="bg-[#111] p-3 rounded-2xl border border-[#222] mb-4">
-                   <div className="flex items-center justify-between mb-2">
-                     <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                       <Users size={14} className="text-[#00FF00]" /> Jogadores ({players.length})
-                     </h3>
-                     <span className="text-[9px] bg-[#00FF00]/10 text-[#00FF00] px-2 py-0.5 rounded-full font-black border border-[#00FF00]/20">ONLINE</span>
-                   </div>
-                   <div className="flex flex-wrap gap-2">
-                     {players.length === 0 ? (
-                       <p className="text-[10px] text-zinc-600 font-bold uppercase py-2">Nenhum jogador na sala...</p>
-                     ) : (
-                       players.map(p => {
-                         const isMe = p.id === user?.uid;
-                         const isPlayerHost = room?.hostId === p.id;
-                         return (
-                           <div key={p.id} className="bg-[#1a1a1a] px-3 py-1.5 rounded-lg border border-[#333] flex items-center gap-2">
-                             <div className="w-2 h-2 rounded-full bg-[#00FF00] animate-pulse"></div>
-                             <span className={`text-[11px] font-black uppercase truncate max-w-[80px] ${isMe ? 'text-[#00FF00]' : 'text-zinc-300'}`}>
-                               {p.name} {isMe && '(VOCÊ)'}
-                             </span>
-                             {isPlayerHost ? (
-                               <Crown size={10} className="text-yellow-500" />
-                             ) : (
-                               isHost && !isTV && (
-                                 <button 
-                                   onClick={() => transferHost(roomId, p.id)}
-                                   className="ml-1 text-[8px] font-black bg-[#222] text-zinc-400 border border-[#333] px-1.5 py-0.5 rounded hover:bg-[#00FF00] hover:text-black hover:border-[#00FF00] transition-all uppercase tracking-tighter"
-                                   title="Tornar Anfitrião"
-                                 >
-                                   HOST
-                                 </button>
-                               )
-                             )}
-                           </div>
-                         );
-                       })
-                     )}
-                   </div>
-                </div>
-
-                {isHost ? (
-                  <div className="flex flex-col gap-3 mb-4">
-                    <div className="bg-[#111] p-3 rounded-2xl border border-[#222] space-y-4">
-                      {/* Grid Size */}
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest text-center">Tamanho da Grade</label>
-                        <div className="grid grid-cols-5 gap-1">
-                          {[4, 5, 6, 7, 8].map(size => (
-                            <button 
-                              key={size}
-                              onClick={() => updateRoomSettings(roomId, { gridSize: size, board: generateBoard(size) })}
-                              className={`py-2 rounded-lg font-black text-[10px] transition-all border ${room.gridSize === size ? 'bg-[#00FF00] text-black border-[#00FF00]' : 'bg-[#0a0a0a] text-zinc-500 border-[#222]'}`}
-                            >
-                              {size}x{size}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Duration & Min Letters - Row */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest text-center">Tempo</label>
-                          <select 
-                            value={room.duration}
-                            onChange={(e) => updateRoomSettings(roomId, { duration: parseInt(e.target.value) })}
-                            className="bg-[#0a0a0a] text-zinc-300 p-2 rounded-xl border border-[#222] font-black text-xs text-center outline-none focus:border-[#00FF00]"
-                          >
-                            {[60, 90, 120, 180, 240, 300].map(time => (
-                              <option key={time} value={time}>{time}s</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest text-center">Mínimo Letras</label>
-                          <div className="flex items-center justify-between bg-[#0a0a0a] p-1 rounded-xl border border-[#222]">
-                            <button 
-                              onClick={() => updateRoomSettings(roomId, { minWordLength: Math.max(3, (room.minWordLength || 3) - 1) })}
-                              className="w-7 h-7 rounded-lg bg-[#1a1a1a] flex items-center justify-center text-[#00FF00]"
-                            >
-                              <Minus size={14} />
-                            </button>
-                            <span className="text-sm font-black text-white">{room.minWordLength || 3}</span>
-                            <button 
-                              onClick={() => updateRoomSettings(roomId, { minWordLength: Math.min(8, (room.minWordLength || 3) + 1) })}
-                              className="w-7 h-7 rounded-lg bg-[#1a1a1a] flex items-center justify-center text-[#00FF00]"
-                            >
-                              <Plus size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-col gap-2">
-                      <button onClick={handleStartGame} className="w-full bg-[#00FF00] text-black py-4 rounded-2xl font-black text-lg shadow-[0_0_25px_rgba(0,255,0,0.3)] active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-[0.2em]">
-                        <Play size={24} fill="currentColor" /> JOGAR
-                      </button>
-                      <button 
-                        onClick={() => setIsWordBankOpen(true)}
-                        className="w-full py-2 bg-[#1a1a1a] text-zinc-400 rounded-xl font-bold uppercase tracking-wider text-[10px] border border-[#333] transition"
-                      >
-                        Banco de Palavras
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-[#111] border border-[#222] p-4 rounded-2xl mb-4 flex flex-col items-center gap-3">
-                     <div className="flex items-center gap-3 text-lg font-black text-zinc-100">
-                        <Clock size={20} className="text-[#00FF00]" /> 
-                        <span>{room.duration}s</span>
-                        <span className="text-zinc-700">•</span>
-                        <span>{room.gridSize}x{room.gridSize}</span>
-                     </div>
-                     <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold">Aguardando o Host...</p>
+                  <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full">
                      <button 
-                        onClick={() => setIsWordBankOpen(true)}
-                        className="py-2 px-4 bg-[#1a1a1a] text-zinc-400 rounded-xl font-bold uppercase tracking-wider text-[10px] border border-[#333] transition"
-                      >
-                        Ver Banco de Palavras
-                      </button>
+                       onClick={() => {
+                         navigator.clipboard.writeText(joinUrl);
+                         showMessage('Link copiado!', 'success');
+                       }}
+                       className="flex-1 py-2 px-2 bg-[#1a1a1a] text-zinc-300 rounded-xl font-black text-[10px] uppercase tracking-wider border border-[#333] flex items-center justify-center gap-1.5"
+                     >
+                       <Share2 size={14} /> Link
+                     </button>
+                     <button 
+                       onClick={() => window.open(`/?room=${roomId.toUpperCase()}&tv=true`, '_blank')}
+                       className="flex-1 py-2 px-2 bg-[#1a1a1a] text-[#00FF00] rounded-xl font-black text-[10px] uppercase tracking-wider border border-[#00FF00]/20 flex items-center justify-center gap-1.5"
+                     >
+                       <MonitorPlay size={14} /> TV
+                     </button>
                   </div>
-                )}
+                </div>
               </div>
-            )}
 
-            {/* Grid do Board */}
+              {/* Players List in Lobby - Higher Position */}
+              <div className="bg-[#111] p-3 rounded-2xl border border-[#222] mb-4">
+                 <div className="flex items-center justify-between mb-2">
+                   <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                     <Users size={14} className="text-[#00FF00]" /> Jogadores ({players.length})
+                   </h3>
+                   <span className="text-[9px] bg-[#00FF00]/10 text-[#00FF00] px-2 py-0.5 rounded-full font-black border border-[#00FF00]/20">ONLINE</span>
+                 </div>
+                 <div className="flex flex-wrap gap-2">
+                   {players.length === 0 ? (
+                     <p className="text-[10px] text-zinc-600 font-bold uppercase py-2">Nenhum jogador na sala...</p>
+                   ) : (
+                     players.map(p => {
+                       const isMe = p.id === user?.uid;
+                       const isPlayerHost = room?.hostId === p.id;
+                       return (
+                         <div key={p.id} className="bg-[#1a1a1a] px-3 py-1.5 rounded-lg border border-[#333] flex items-center gap-2">
+                           <div className="w-2 h-2 rounded-full bg-[#00FF00] animate-pulse"></div>
+                           <span className={`text-[11px] font-black uppercase truncate max-w-[80px] ${isMe ? 'text-[#00FF00]' : 'text-zinc-300'}`}>
+                             {p.name} {isMe && '(VOCÊ)'}
+                           </span>
+                           {isPlayerHost ? (
+                             <Crown size={10} className="text-yellow-500" />
+                           ) : (
+                             isHost && !isTV && (
+                               <button 
+                                 onClick={() => transferHost(roomId, p.id)}
+                                 className="ml-1 text-[8px] font-black bg-[#222] text-zinc-400 border border-[#333] px-1.5 py-0.5 rounded hover:bg-[#00FF00] hover:text-black hover:border-[#00FF00] transition-all uppercase tracking-tighter"
+                                 title="Tornar Anfitrião"
+                               >
+                                 HOST
+                               </button>
+                             )
+                           )}
+                         </div>
+                       );
+                     })
+                   )}
+                 </div>
+              </div>
+
+              {isHost ? (
+                <div className="flex flex-col gap-3 mb-4">
+                  <div className="bg-[#111] p-3 rounded-2xl border border-[#222] space-y-4">
+                    {/* Grid Size */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest text-center">Tamanho da Grade</label>
+                      <div className="flex flex-wrap justify-center gap-1">
+                        {[4, 5, 6, 7, 8].map(size => (
+                          <button 
+                            key={size}
+                            onClick={() => updateRoomSettings(roomId, { gridSize: size, board: generateBoard(size) })}
+                            className={`py-2 px-3 rounded-lg font-black text-[10px] transition-all border ${room.gridSize === size ? 'bg-[#00FF00] text-black border-[#00FF00]' : 'bg-[#0a0a0a] text-zinc-500 border-[#222]'}`}
+                          >
+                            {size}x{size}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Duration & Min Letters - Row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest text-center">Tempo</label>
+                        <select 
+                          value={room.duration}
+                          onChange={(e) => updateRoomSettings(roomId, { duration: parseInt(e.target.value) })}
+                          className="bg-[#0a0a0a] text-zinc-300 p-2 rounded-xl border border-[#222] font-black text-xs text-center outline-none focus:border-[#00FF00] w-full"
+                        >
+                          {[60, 90, 120, 180, 240, 300].map(time => (
+                            <option key={time} value={time}>{time}s</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest text-center">Mínimo Letras</label>
+                        <div className="flex items-center justify-between bg-[#0a0a0a] p-1 rounded-xl border border-[#222] w-full">
+                          <button 
+                            onClick={() => updateRoomSettings(roomId, { minWordLength: Math.max(3, (room.minWordLength || 3) - 1) })}
+                            className="w-7 h-7 rounded-lg bg-[#1a1a1a] flex items-center justify-center text-[#00FF00]"
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <span className="text-sm font-black text-white px-2">{room.minWordLength || 3}</span>
+                          <button 
+                            onClick={() => updateRoomSettings(roomId, { minWordLength: Math.min(8, (room.minWordLength || 3) + 1) })}
+                            className="w-7 h-7 rounded-lg bg-[#1a1a1a] flex items-center justify-center text-[#00FF00]"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2">
+                    <button onClick={handleStartGame} className="w-full bg-[#00FF00] text-black py-4 rounded-2xl font-black text-lg shadow-[0_0_25px_rgba(0,255,0,0.3)] active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-[0.2em]">
+                      <Play size={24} fill="currentColor" /> JOGAR
+                    </button>
+                    <button 
+                      onClick={() => setIsWordBankOpen(true)}
+                      className="w-full py-2 bg-[#1a1a1a] text-zinc-400 rounded-xl font-bold uppercase tracking-wider text-[10px] border border-[#333] transition"
+                    >
+                      Banco de Palavras
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-[#111] border border-[#222] p-4 rounded-2xl mb-4 flex flex-col items-center gap-3">
+                   <div className="flex items-center gap-3 text-lg font-black text-zinc-100">
+                      <Clock size={20} className="text-[#00FF00]" /> 
+                      <span>{room.duration}s</span>
+                      <span className="text-zinc-700">•</span>
+                      <span>{room.gridSize}x{room.gridSize}</span>
+                   </div>
+                   <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold">Aguardando o Host...</p>
+                   <button 
+                      onClick={() => setIsWordBankOpen(true)}
+                      className="py-2 px-4 bg-[#1a1a1a] text-zinc-400 rounded-xl font-bold uppercase tracking-wider text-[10px] border border-[#333] transition"
+                    >
+                      Ver Banco de Palavras
+                    </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {room.status !== 'waiting' && (
+            <>
+            <div 
+              className={`p-3 rounded-3xl select-none touch-none mb-4 relative overflow-hidden transition-all duration-1000 ${
+                room.status === 'playing' 
+                  ? 'bg-[#1a1a1a] shadow-[0_0_60px_rgba(0,255,0,0.15)] border border-[#00FF00]/40' 
+                  : 'bg-[#141414] shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-[#222]'
+              }`}
+              style={{ touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+            >
+              {/* Grid do Board */}
             <div 
               ref={gridRef}
               className="grid gap-2 md:gap-3 aspect-square"
@@ -1202,6 +1219,8 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
                 </div>
              )}
           </div>
+          </>
+        )}
         </div>
 
         {/* Lado Direito - Placar e Jogadores */}

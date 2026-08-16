@@ -189,28 +189,11 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
   const tileRectsRef = useRef<{index: number, rect: DOMRect, centerX: number, centerY: number}[]>([]);
 
   const getTileIndexFromCoords = (clientX: number, clientY: number): number | null => {
-    if (tileRectsRef.current.length === 0) return null;
-
-    let closestIndex: number | null = null;
-    let minDistance = Infinity;
-    
-    // Determine the size of a single tile from the first element
-    const tileWidth = tileRectsRef.current[0].rect.width;
-    const maxDistance = tileWidth * 1.5; // Generous outer boundary to catch fast diagonal swipes
-
-    for (const {index, centerX, centerY} of tileRectsRef.current) {
-        const dist = Math.hypot(clientX - centerX, clientY - centerY);
-        if (dist < minDistance) {
-            minDistance = dist;
-            closestIndex = index;
-        }
-    }
-
-    if (closestIndex !== null && minDistance < maxDistance) {
-        return closestIndex;
-    }
-
-    return null;
+    const el = document.elementFromPoint(clientX, clientY);
+    if (!el) return null;
+    const tile = el.closest('[data-index]');
+    if (!tile) return null;
+    return parseInt(tile.getAttribute('data-index')!, 10);
   };
 
   const startDrag = (index: number, letter: string, e?: React.SyntheticEvent) => {
@@ -492,7 +475,11 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
 
               <div 
                 ref={gridRef}
-                className="grid gap-2 md:gap-3 bg-[#0a0a0a] p-4 md:p-6 rounded-3xl touch-none select-none border border-[#222] shadow-inner aspect-square w-full max-w-xl mx-auto"
+                className={`grid gap-2 md:gap-3 p-4 md:p-6 rounded-3xl touch-none select-none border aspect-square w-full max-w-xl mx-auto transition-all duration-1000 ${
+                  status === 'playing'
+                    ? 'bg-[#1a1a1a] shadow-[0_0_60px_rgba(0,255,0,0.15)] border-[#00FF00]/40'
+                    : 'bg-[#0a0a0a] shadow-inner border-[#222]'
+                }`}
                 style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`, touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
               >
                 {board.map((letter: string, index: number) => {
@@ -556,7 +543,8 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
             {/* Board Replay for Solo / Offline Training */}
             <BoardReplay 
               board={board} 
-              gridSize={gridSize} 
+              gridSize={gridSize}
+              minWordLength={minWordLength}
               players={soloPlayer}
             />
           </div>
