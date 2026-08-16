@@ -309,10 +309,14 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
     setIsDragging(true);
 
     setSelectedPath((prevPath) => {
-      // If tapping last letter again when word length >= minWordLength, submit word
-      if (prevPath.length > 0 && prevPath[prevPath.length - 1] === index && prevPath.length >= (room?.minWordLength || 3)) {
-        setTimeout(() => submitWordFromPath(prevPath), 0);
-        return prevPath;
+      // If tapping last letter again
+      if (prevPath.length > 0 && prevPath[prevPath.length - 1] === index) {
+        if (prevPath.length >= (room?.minWordLength || 3)) {
+          setTimeout(() => submitWordFromPath(prevPath), 0);
+          return prevPath;
+        } else {
+          return []; // Clear if too short
+        }
       }
 
       // If tapping second-to-last letter, backspace 1 letter
@@ -808,7 +812,7 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
                  <p className="text-zinc-400 font-bold tracking-widest text-xs uppercase mt-1">Veja a trajetória de cada palavra encontrada no tabuleiro!</p>
                </div>
              </div>
-             <div className="flex gap-4 w-full md:w-auto">
+             <div className="flex flex-wrap gap-4 w-full md:w-auto mt-4 md:mt-0">
                <button 
                  onClick={() => setShowTvReplay(true)}
                  className="flex-1 md:flex-none px-6 py-3 bg-[#4c1d95] text-white font-black rounded-xl hover:bg-[#5b21b6] transition flex items-center justify-center gap-2 uppercase tracking-wider shadow-[0_0_15px_rgba(109,40,217,0.4)]"
@@ -818,10 +822,14 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
                <button onClick={onLeave} className="flex-1 md:flex-none px-6 py-3 bg-[#111] text-zinc-300 border border-[#333] font-bold rounded-xl hover:bg-[#222] transition text-center uppercase tracking-wider text-sm">
                  Sair da Sala
                </button>
-               {isHost && (
-                 <button onClick={() => restartGame(roomId, room?.gridSize || 4)} className="flex-1 md:flex-none px-6 py-3 bg-[#00FF00] text-black font-black rounded-xl hover:bg-[#00e600] transition flex items-center justify-center gap-2 uppercase tracking-wider shadow-[0_0_15px_rgba(0,255,0,0.2)]">
+               {isHost ? (
+                 <button onClick={() => restartGame(roomId, room?.gridSize || 4)} className="w-full md:w-auto px-6 py-3 bg-[#00FF00] text-black font-black rounded-xl hover:bg-[#00e600] transition flex items-center justify-center gap-2 uppercase tracking-wider shadow-[0_0_15px_rgba(0,255,0,0.2)]">
                    <Play size={20} /> Jogar Novamente
                  </button>
+               ) : (
+                 <div className="w-full md:w-auto px-6 py-3 bg-[#1a1a1a] text-zinc-500 font-bold rounded-xl border border-[#333] flex items-center justify-center text-center uppercase tracking-wider text-xs">
+                   Aguardando o Anfitrião...
+                 </div>
                )}
              </div>
            </header>
@@ -913,12 +921,12 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
         
         {/* Lado Esquerdo - Tabuleiro e Controles */}
         <div className="flex-1 w-full max-w-md mx-auto">
-          <header className="mb-4 flex justify-between items-center bg-[#141414] p-3 rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-[#222]">
+          <header className="mb-4 flex flex-wrap gap-2 justify-between items-center bg-[#141414] p-3 rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-[#222]">
             <div className="overflow-hidden flex items-center gap-3">
               <button onClick={onLeave} className="p-2 bg-[#1a1a1a] text-zinc-500 hover:text-zinc-300 transition rounded-xl border border-[#333]">
                 <ArrowLeft size={18} />
               </button>
-              <div>
+              <div className="min-w-0">
                 <p className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 leading-none mb-1">SALA ONLINE</p>
                 <h1 className="text-xl font-black tracking-widest text-[#00FF00] flex items-center gap-2 uppercase truncate leading-none">
                   {displayRoomId}
@@ -926,7 +934,7 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
               </div>
             </div>
             
-            <div className="flex gap-2 items-center">
+            <div className="flex flex-wrap gap-2 items-center">
               <button
                 onClick={toggleFullscreen}
                 className="p-2.5 bg-[#1a1a1a] hover:bg-[#222] text-zinc-400 hover:text-zinc-200 rounded-xl border border-[#333] transition"
@@ -1150,32 +1158,23 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
             </div>
           </div>
 
-          <div className="h-20 flex items-center justify-center bg-[#141414] rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-[#222]">
+          <div className="h-20 flex flex-col items-center justify-center bg-[#141414] rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-[#222] py-2 relative">
+             <div className="absolute top-1 right-2 text-[9px] font-black uppercase tracking-widest text-zinc-600">
+               Mínimo: {room?.minWordLength || 3} Letras
+             </div>
              {isPlaying && (
                 <div className="text-center w-full px-3">
-                  <div className={`text-2xl sm:text-3xl font-black tracking-widest ${isChecking ? 'text-zinc-500' : 'text-[#00FF00] drop-shadow-[0_0_10px_rgba(0,255,0,0.3)]'} flex items-center justify-center gap-2 sm:gap-3 h-10 uppercase`}>
-                    {currentWord || <span className="text-[#333]">___</span>}
-                    {isChecking && <Loader2 size={24} className="animate-spin text-zinc-500" />}
-                    
-                    {selectedPath.length > 0 && !isChecking && (
-                      <div className="flex items-center gap-1.5 ml-2">
-                        <button 
-                          onClick={() => setSelectedPath([])}
-                          className="px-2 py-1 bg-[#222] hover:bg-[#333] text-zinc-400 rounded-lg text-[10px] font-black uppercase tracking-wider border border-[#333] transition"
-                        >
-                          LIMPAR
-                        </button>
-                        {selectedPath.length >= (room?.minWordLength || 3) && (
-                          <button 
-                            onClick={() => submitWordFromPath(selectedPath)}
-                            className="px-2.5 py-1 bg-[#00FF00] hover:bg-[#00e600] text-black rounded-lg text-[10px] font-black uppercase tracking-wider shadow-[0_0_10px_rgba(0,255,0,0.4)] transition"
-                          >
-                            ENVIAR
-                          </button>
-                        )}
-                      </div>
-                    )}
+                  <div className={`text-2xl sm:text-3xl font-black tracking-widest ${isChecking ? 'text-zinc-500' : 'text-[#00FF00] drop-shadow-[0_0_10px_rgba(0,255,0,0.3)]'} flex items-center justify-center gap-1 sm:gap-2 h-8 uppercase`}>
+                    {currentWord || <div className="flex gap-1 text-[#333] tracking-[0.2em]">{Array.from({ length: room?.minWordLength || 3 }).map((_, i) => <span key={i}>_</span>)}</div>}
+                    {isChecking && <Loader2 size={24} className="animate-spin text-zinc-500 ml-2" />}
                   </div>
+                  
+                  {selectedPath.length > 0 && !isChecking && (
+                    <div className="flex items-center gap-1.5 ml-2">
+                      {/* Auto-submit e tap-to-clear nativo removes need for buttons */}
+                    </div>
+                  )}
+
                   <div className="h-6 mt-1 flex items-center justify-center">
                     {message && (
                       <div className={`text-xs font-black flex items-center gap-2 uppercase tracking-widest

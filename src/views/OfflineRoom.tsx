@@ -241,10 +241,14 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
     setMessage(null);
 
     setCurrentWord(prev => {
-      // If clicking last letter again when word >= minWordLength, submit word
-      if (prev.length > 0 && prev[prev.length - 1].index === index && prev.length >= minWordLength) {
-        setTimeout(() => submitOfflineWord(prev), 0);
-        return prev;
+      // If clicking last letter again
+      if (prev.length > 0 && prev[prev.length - 1].index === index) {
+        if (prev.length >= minWordLength) {
+          setTimeout(() => submitOfflineWord(prev), 0);
+          return prev;
+        } else {
+          return [];
+        }
       }
 
       // If clicking second-to-last letter, backspace 1 letter
@@ -410,12 +414,12 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
   return (
     <div className={`min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans p-3 sm:p-4 md:p-8 select-none ${isFakeFullscreen ? 'fixed inset-0 z-[100] overflow-y-auto w-full h-full' : ''}`}>
       <div className="max-w-4xl mx-auto flex flex-col gap-5 sm:gap-6">
-        <header className="bg-[#141414] p-4 sm:p-6 rounded-3xl shadow-[0_0_20px_rgba(0,0,0,0.8)] border border-[#222] flex justify-between items-center">
+        <header className="bg-[#141414] p-4 sm:p-6 rounded-3xl shadow-[0_0_20px_rgba(0,0,0,0.8)] border border-[#222] flex flex-wrap gap-3 justify-between items-center">
           <div>
             <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-[#00FF00] bg-[#00FF00]/10 px-2 py-0.5 rounded border border-[#00FF00]/30">LOUD BOOGLE</span>
             <h1 className="text-xl sm:text-2xl font-black text-zinc-100 uppercase tracking-widest mt-0.5 sm:mt-1">Modo Treino</h1>
           </div>
-          <div className="flex gap-2 sm:gap-3 items-center">
+          <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
             <button 
               onClick={toggleFullscreen} 
               className="p-2.5 bg-[#1a1a1a] hover:bg-[#222] text-zinc-400 hover:text-zinc-200 rounded-xl border border-[#333] transition"
@@ -458,29 +462,19 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
                 <div className="text-2xl font-black text-[#00FF00] drop-shadow-[0_0_10px_rgba(0,255,0,0.2)]">{totalScore} <span className="text-xs text-zinc-600 font-bold uppercase tracking-widest">pts</span></div>
               </div>
               
-              <div className="mb-4 h-12 flex items-center justify-center w-full">
+              <div className="mb-4 h-12 flex flex-col items-center justify-center w-full relative py-2">
+                <div className="absolute top-0 right-2 text-[9px] font-black uppercase tracking-widest text-zinc-600">
+                  Mínimo: {minWordLength} Letras
+                </div>
                 {currentWord.length > 0 ? (
-                  <div className="text-3xl font-black tracking-widest uppercase text-[#00FF00] drop-shadow-[0_0_10px_rgba(0,255,0,0.2)] flex items-center justify-center gap-2">
+                  <div className="text-3xl font-black tracking-widest uppercase text-[#00FF00] drop-shadow-[0_0_10px_rgba(0,255,0,0.2)] flex items-center justify-center gap-2 mt-2">
                     <span>{currentWord.map(w => w.letter).join('')}</span>
                     <div className="flex items-center gap-1.5 ml-2">
-                      <button 
-                        onClick={() => setCurrentWord([])}
-                        className="px-2 py-1 bg-[#222] hover:bg-[#333] text-zinc-400 rounded-lg text-[10px] font-black uppercase tracking-wider border border-[#333] transition"
-                      >
-                        LIMPAR
-                      </button>
-                      {currentWord.length >= minWordLength && (
-                        <button 
-                          onClick={() => submitOfflineWord(currentWord)}
-                          className="px-2.5 py-1 bg-[#00FF00] hover:bg-[#00e600] text-black rounded-lg text-[10px] font-black uppercase tracking-wider shadow-[0_0_10px_rgba(0,255,0,0.4)] transition"
-                        >
-                          ENVIAR
-                        </button>
-                      )}
+                      {/* Auto-submit e tap-to-clear removes need for buttons */}
                     </div>
                   </div>
                 ) : message ? (
-                  <div className={`flex items-center gap-2 font-black px-4 py-2 rounded-xl text-sm uppercase tracking-widest border ${message.type === 'error' ? 'bg-red-900/20 text-red-500 border-red-500/30' : 'bg-[#00FF00]/10 text-[#00FF00] border-[#00FF00]/30'}`}>
+                  <div className={`flex items-center gap-2 font-black px-4 py-2 rounded-xl text-sm uppercase tracking-widest border mt-2 ${message.type === 'error' ? 'bg-red-900/20 text-red-500 border-red-500/30' : 'bg-[#00FF00]/10 text-[#00FF00] border-[#00FF00]/30'}`}>
                     {message.type === 'error' ? <X size={20} strokeWidth={3} /> : <Check size={20} strokeWidth={3} />}
                     {message.text}
                     {message.word && (
@@ -490,7 +484,9 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
                     )}
                   </div>
                 ) : (
-                  <div className="text-zinc-600 font-bold text-sm uppercase tracking-widest">Deslize para formar palavras</div>
+                  <div className="flex gap-1 text-[#333] tracking-[0.2em] mt-2 text-3xl font-black">
+                    {Array.from({ length: minWordLength }).map((_, i) => <span key={i}>_</span>)}
+                  </div>
                 )}
               </div>
 
@@ -547,12 +543,12 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
 
         {status === 'gameover' && (
           <div className="flex flex-col gap-6 animate-in fade-in zoom-in duration-500">
-            <div className="bg-[#141414] p-6 rounded-3xl border border-[#222] flex justify-between items-center">
+            <div className="bg-[#141414] p-6 rounded-3xl border border-[#222] flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
               <div>
                 <h2 className="text-3xl font-black text-[#00FF00] uppercase tracking-widest drop-shadow-[0_0_15px_rgba(0,255,0,0.3)]">Treino Concluído!</h2>
                 <p className="text-zinc-400 font-bold uppercase tracking-widest text-xs mt-1">Pontuação Final: {totalScore} pontos • {words.length} palavras</p>
               </div>
-              <button onClick={restartGame} className="bg-[#00FF00] text-black px-6 py-3 rounded-xl font-black uppercase tracking-widest text-sm hover:bg-[#00e600] transition flex items-center gap-2 shadow-[0_0_15px_rgba(0,255,0,0.2)]">
+              <button onClick={restartGame} className="w-full md:w-auto bg-[#00FF00] text-black px-6 py-3 rounded-xl font-black uppercase tracking-widest text-sm hover:bg-[#00e600] transition flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,255,0,0.2)]">
                 <RotateCcw size={18} /> Treinar Novamente
               </button>
             </div>
