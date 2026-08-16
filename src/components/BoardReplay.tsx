@@ -185,16 +185,9 @@ export default function BoardReplay({ board, gridSize = 4, minWordLength = 3, pl
     playReplayStep();
   };
 
-  if (allWordRecords.length === 0) {
-    return (
-      <div className="bg-[#111] p-8 rounded-3xl border border-[#222] text-center max-w-xl mx-auto shadow-2xl">
-        <p className="text-zinc-400 font-bold uppercase tracking-widest text-sm">Nenhuma palavra foi encontrada nesta rodada.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-[#111111] border border-[#222] rounded-3xl p-3 sm:p-4 md:p-6 shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col lg:flex-row gap-6 w-full max-w-5xl mx-auto overflow-hidden">
+    <div className="w-full max-w-5xl mx-auto space-y-6">
+      <div className="bg-[#111111] border border-[#222] rounded-3xl p-3 sm:p-4 md:p-6 shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col lg:flex-row gap-6 w-full overflow-hidden">
       {/* Left Column: Interactive Replay Board */}
       <div className="flex-1 flex flex-col items-center w-full">
         {/* Header with Title & Speed Switcher */}
@@ -436,9 +429,10 @@ export default function BoardReplay({ board, gridSize = 4, minWordLength = 3, pl
           })}
         </div>
       </div>
+      </div>
 
       {/* Board Analysis Card */}
-      <div className="bg-[#141414] border border-[#222] p-6 rounded-3xl shadow-xl flex flex-col gap-4 mt-6">
+      <div className="bg-[#141414] border border-[#222] p-5 sm:p-6 rounded-3xl shadow-xl flex flex-col gap-4">
         <div className="flex items-center justify-between border-b border-[#222] pb-3">
           <div className="flex items-center gap-2">
             <Award className="text-[#00FF00]" size={20} />

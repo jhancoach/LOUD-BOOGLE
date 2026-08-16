@@ -399,8 +399,10 @@ export default function Room({ roomId, isTV, onLeave }: { roomId: string, isTV?:
     setSelectedPath((currentPath) => {
       if (currentPath.length >= (room?.minWordLength || 3)) {
         setTimeout(() => submitWordFromPath(currentPath), 0);
+        return currentPath;
       }
-      return currentPath;
+      // If below minimum length, clear selection so the user can start a new word immediately
+      return [];
     });
   };
 

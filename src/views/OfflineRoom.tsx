@@ -335,8 +335,10 @@ export default function OfflineRoom({ onLeave, duration = 180, gridSize = 4, min
     setCurrentWord(currentList => {
       if (currentList.length >= minWordLength) {
         setTimeout(() => submitOfflineWord(currentList), 0);
+        return currentList;
       }
-      return currentList;
+      // If below minimum length, clear selection so user can start a new word immediately
+      return [];
     });
   };
 
